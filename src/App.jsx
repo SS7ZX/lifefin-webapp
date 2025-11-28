@@ -340,7 +340,7 @@ const App = () => {
           <div className="mb-8 flex justify-center scale-125"><Logo /></div>
           <Card className="border-t-4 border-t-cyan-500 bg-slate-900/80 backdrop-blur-xl relative">
             <div className="absolute top-2 right-2 text-[10px] text-slate-600 bg-slate-900 px-2 py-1 rounded border border-slate-800">
-              v4.0 (Final Proper)
+              v1.29.25.12
             </div>
 
             <h2 className="text-2xl font-bold text-white mb-2 text-center">{isRegister ? 'Daftar Akun Baru' : 'Login LifeFin'}</h2>
