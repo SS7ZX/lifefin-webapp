@@ -262,7 +262,7 @@ const App = () => {
     };
   }, [user]);
 
-  // --- AUTH ACTIONS ---
+  // --- AUTH ACTIONS (REVISI - LOGIC SIMPEL) ---
   const handleAuth = async (e) => {
     e.preventDefault();
     setAuthLoading(true);
@@ -280,11 +280,12 @@ const App = () => {
       const usersRef = collection(db, 'users');
       
       if (isRegister) {
+        // --- REGISTER: Cek Username Saja (Aman) ---
         const q = query(usersRef, where('username', '==', username));
         const snap = await getDocs(q);
         
         if (!snap.empty) {
-          throw new Error('Username sudah dipakai!');
+          throw new Error('Username sudah dipakai! Coba yang lain.');
         }
 
         await addDoc(usersRef, {
@@ -297,21 +298,32 @@ const App = () => {
         notify('Registrasi Berhasil! Silakan Login.', 'success');
         setIsRegister(false);
       } else {
-        const q = query(usersRef, 
-          where('username', '==', username), 
-          where('password', '==', password),
-          where('role', '==', role)
-        );
+        // --- LOGIN: Cari Username dulu, baru cek password di sini (BYPASS INDEX) ---
+        // 1. Cari user berdasarkan username saja (Query simpel, tidak butuh index)
+        const q = query(usersRef, where('username', '==', username));
         const snap = await getDocs(q);
 
         if (snap.empty) {
-          throw new Error('Username atau Password salah!');
+          throw new Error('Username tidak ditemukan!');
         }
 
+        // 2. Ambil data user pertama yang ketemu
+        const userData = snap.docs[0].data();
+
+        // 3. Cek Password dan Role secara manual di Javascript (Bukan di Firebase)
+        if (userData.password !== password) {
+           throw new Error('Password salah!');
+        }
+        if (userData.role !== role) {
+           throw new Error(`Akun ini bukan role ${role}!`);
+        }
+
+        // Kalau lolos semua
         setUser({ username, role });
         notify(`Selamat datang, ${username}!`, 'success');
       }
     } catch (err) {
+      console.error(err); // Lihat error asli di console (F12)
       notify(err.message, 'error');
     } finally {
       setAuthLoading(false);
@@ -321,7 +333,6 @@ const App = () => {
   // --- APP ACTIONS WITH VALIDATION ---
   
   const addTransaction = async (trx) => {
-    // Validation
     if (!trx.amount || isNaN(trx.amount) || trx.amount <= 0) {
       return notify("Harap mengisi nominal transaksi dengan benar (Angka Positif)!", "error");
     }
@@ -341,7 +352,6 @@ const App = () => {
   };
 
   const addSaving = async (sv) => {
-    // Validation
     if (!sv.name || sv.name.trim() === "") {
         return notify("Harap mengisi nama target tabungan!", "error");
     }
@@ -354,7 +364,6 @@ const App = () => {
   };
 
   const addDeposit = async (id, amount) => {
-    // Validation handled at UI level call, but good to have here too
     if (!amount || isNaN(amount) || amount <= 0) {
         return notify("Harap mengisi jumlah setoran dengan benar!", "error");
     }
@@ -374,7 +383,6 @@ const App = () => {
   };
 
   const applyLoan = async ({ amount, reason }) => {
-    // Validation
     if (!amount || isNaN(amount) || amount <= 0) {
         return notify("Harap mengisi jumlah pinjaman dengan benar!", "error");
     }
@@ -391,7 +399,6 @@ const App = () => {
   };
 
   const buyInvestment = async (inv, amount) => {
-    // Validation
     if (!amount || isNaN(amount) || amount < inv.minAmount) {
         return notify(`Harap mengisi nominal investasi dengan benar (Min: ${formatRupiah(inv.minAmount)})!`, "error");
     }
