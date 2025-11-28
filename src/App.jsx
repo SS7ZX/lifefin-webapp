@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db } from './fire';
+import { db } from './fire'; // Pastikan ini mengarah ke file fire.js kamu
 import { 
   collection, 
   addDoc, 
@@ -8,19 +8,24 @@ import {
   doc, 
   updateDoc,
   query, 
-  orderBy 
+  orderBy,
+  where,
+  getDocs
 } from 'firebase/firestore';
 
 // Icons
 import { 
-  LayoutDashboard, Wallet, PiggyBank, TrendingUp, BookOpen, LogOut, 
-  Plus, CreditCard, DollarSign, PlayCircle, CheckCircle, XCircle, 
-  Activity, Trash2, AlertCircle, Package, ArrowUpRight, ArrowDownRight, BarChart3
+  LayoutDashboard, Wallet, PiggyBank, BookOpen, LogOut, 
+  Plus, CreditCard, PlayCircle, CheckCircle, XCircle, 
+  AlertCircle, Trash2, Eye, EyeOff, ExternalLink
 } from 'lucide-react';
 
 /**
- * UTILITIES
+ * ==================================================================================
+ * 1. UTILITIES & HELPERS (THE TOOLKIT)
+ * ==================================================================================
  */
+
 const formatRupiah = (number) => {
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
@@ -39,16 +44,69 @@ const formatDate = (dateString) => {
   }
 };
 
-// Static Data
+/**
+ * Validasi Input Angka (Helper Senior Dev)
+ * Mengembalikan true jika valid, false jika tidak.
+ */
+const isValidNumber = (value) => {
+  if (!value) return false;
+  const num = parseInt(value);
+  return !isNaN(num) && num > 0;
+};
+
+// Static Data: Produk Investasi
 const INVESTMENT_PRODUCTS = [
   { id: '1', name: 'Reksadana Pasar Uang', returnRate: 5, duration: '1 Tahun', minAmount: 100000, risk: 'Rendah' },
   { id: '2', name: 'Obligasi UMKM', returnRate: 8, duration: '3 Tahun', minAmount: 1000000, risk: 'Sedang' },
   { id: '3', name: 'Saham Blue Chip', returnRate: 12, duration: '5 Tahun', minAmount: 5000000, risk: 'Tinggi' },
 ];
 
+// Static Data: Materi Edukasi
+const EDUCATION_CONTENT = [
+  { 
+    id: 1, 
+    title: 'Dasar Pembukuan Keuangan UMKM', 
+    desc: 'Pelajari cara mencatat arus kas masuk dan keluar agar keuangan usaha tidak bocor.',
+    url: 'https://www.youtube.com/results?search_query=cara+pembukuan+keuangan+umkm+sederhana' 
+  },
+  { 
+    id: 2, 
+    title: 'Strategi Digital Marketing Low Budget', 
+    desc: 'Cara mempromosikan produk di media sosial (TikTok/IG) tanpa biaya iklan mahal.',
+    url: 'https://www.youtube.com/results?search_query=strategi+digital+marketing+umkm+pemula' 
+  },
+  { 
+    id: 3, 
+    title: 'Tips Memisahkan Uang Pribadi & Usaha', 
+    desc: 'Kesalahan fatal pengusaha pemula adalah mencampur dompet. Ini solusinya.',
+    url: 'https://www.youtube.com/results?search_query=cara+memisahkan+uang+pribadi+dan+usaha' 
+  },
+  { 
+    id: 4, 
+    title: 'Inspirasi Kisah Sukses UMKM Indonesia', 
+    desc: 'Belajar dari pengalaman jatuh bangun pengusaha lain untuk motivasi diri.',
+    url: 'https://www.youtube.com/results?search_query=kisah+sukses+pengusaha+umkm+indonesia' 
+  },
+  { 
+    id: 5, 
+    title: 'Cara Foto Produk Pakai HP', 
+    desc: 'Bikin foto produk terlihat profesional dan menjual hanya modal smartphone.',
+    url: 'https://www.youtube.com/results?search_query=tutorial+foto+produk+katalog+pakai+hp' 
+  },
+  { 
+    id: 6, 
+    title: 'Manajemen Stok Barang', 
+    desc: 'Trik agar stok tidak selisih dan gudang tetap rapi.',
+    url: 'https://www.youtube.com/results?search_query=tips+manajemen+stok+barang+toko+kecil' 
+  }
+];
+
 /**
- * UI COMPONENTS
+ * ==================================================================================
+ * 2. UI COMPONENTS (DESIGN SYSTEM)
+ * ==================================================================================
  */
+
 const ToastContainer = ({ toasts, removeToast }) => (
   <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
     {toasts.map(toast => (
@@ -86,12 +144,38 @@ const Card = ({ children, className = '', title, icon: Icon }) => (
   </div>
 );
 
-const Input = ({ label, type = "text", value, onChange, placeholder, className = "", min }) => (
+const Input = ({ label, type = "text", value, onChange, placeholder, className = "", min, name }) => (
   <div className={`mb-4 ${className}`}>
     {label && <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">{label}</label>}
-    <input type={type} value={value} onChange={onChange} placeholder={placeholder} min={min} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors placeholder:text-slate-600" />
+    <input name={name} type={type} value={value} onChange={onChange} placeholder={placeholder} min={min} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors placeholder:text-slate-600" />
   </div>
 );
+
+const PasswordInput = ({ label, value, onChange, placeholder, name }) => {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="mb-4">
+      {label && <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">{label}</label>}
+      <div className="relative">
+        <input 
+          name={name}
+          type={show ? "text" : "password"} 
+          value={value} 
+          onChange={onChange} 
+          placeholder={placeholder} 
+          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors placeholder:text-slate-600 pr-10" 
+        />
+        <button 
+          type="button"
+          onClick={() => setShow(!show)}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-cyan-400 transition-colors"
+        >
+          {show ? <EyeOff size={18} /> : <Eye size={18} />}
+        </button>
+      </div>
+    </div>
+  );
+};
 
 const Logo = ({ size = "text-2xl" }) => (
   <div className={`font-bold flex items-center gap-2 ${size} select-none`}>
@@ -128,16 +212,21 @@ const SimpleChart = ({ data, color = "#22d3ee" }) => {
 };
 
 /**
- * MAIN APP
+ * ==================================================================================
+ * 3. MAIN APP & LOGIC (CONTROLLER)
+ * ==================================================================================
  */
 const App = () => {
   const [user, setUser] = useState(null);
   const [activePage, setActivePage] = useState('dashboard');
   const [toasts, setToasts] = useState([]);
   
-  // DATA STATE (LIVE DARI FIREBASE)
+  // Login State
+  const [isRegister, setIsRegister] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
+
+  // DATA STATE
   const [transactions, setTransactions] = useState([]);
-  const [inventory, setInventory] = useState([]);
   const [savings, setSavings] = useState([]);
   const [loans, setLoans] = useState([]);
   const [myInvestments, setMyInvestments] = useState([]);
@@ -150,62 +239,126 @@ const App = () => {
   };
   const removeToast = (id) => setToasts(prev => prev.filter(t => t.id !== id));
 
-  // --- FIREBASE LISTENERS (REALTIME SYNC) ---
+  // --- FIREBASE LISTENERS ---
   useEffect(() => {
-    // 1. Transactions
+    if (!user) return;
+
     const qTrx = query(collection(db, "transactions"), orderBy("createdAt", "desc"));
     const unsubTrx = onSnapshot(qTrx, (snapshot) => {
       setTransactions(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
     });
-    // 2. Inventory
-    const unsubInv = onSnapshot(collection(db, "inventory"), (snapshot) => {
-      setInventory(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
-    });
-    // 3. Savings
     const unsubSav = onSnapshot(collection(db, "savings"), (snapshot) => {
       setSavings(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
     });
-    // 4. Loans
     const unsubLoans = onSnapshot(collection(db, "loans"), (snapshot) => {
       setLoans(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
     });
-    // 5. Investments
     const unsubInvest = onSnapshot(collection(db, "my_investments"), (snapshot) => {
       setMyInvestments(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
     });
 
     return () => {
-      unsubTrx(); unsubInv(); unsubSav(); unsubLoans(); unsubInvest();
+      unsubTrx(); unsubSav(); unsubLoans(); unsubInvest();
     };
-  }, []);
+  }, [user]);
 
-  // --- ACTIONS (KIRIM KE FIREBASE) ---
+  // --- AUTH ACTIONS ---
+  const handleAuth = async (e) => {
+    e.preventDefault();
+    setAuthLoading(true);
+    const formData = new FormData(e.target);
+    const username = formData.get('username');
+    const password = formData.get('password');
+    const role = formData.get('role');
+
+    if(!username || !password) {
+      setAuthLoading(false);
+      return notify('Harap mengisi username dan password dengan benar!', 'error');
+    }
+
+    try {
+      const usersRef = collection(db, 'users');
+      
+      if (isRegister) {
+        const q = query(usersRef, where('username', '==', username));
+        const snap = await getDocs(q);
+        
+        if (!snap.empty) {
+          throw new Error('Username sudah dipakai!');
+        }
+
+        await addDoc(usersRef, {
+          username,
+          password, 
+          role,
+          createdAt: new Date().toISOString()
+        });
+        
+        notify('Registrasi Berhasil! Silakan Login.', 'success');
+        setIsRegister(false);
+      } else {
+        const q = query(usersRef, 
+          where('username', '==', username), 
+          where('password', '==', password),
+          where('role', '==', role)
+        );
+        const snap = await getDocs(q);
+
+        if (snap.empty) {
+          throw new Error('Username atau Password salah!');
+        }
+
+        setUser({ username, role });
+        notify(`Selamat datang, ${username}!`, 'success');
+      }
+    } catch (err) {
+      notify(err.message, 'error');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  // --- APP ACTIONS WITH VALIDATION ---
   
   const addTransaction = async (trx) => {
-    try {
-      await addDoc(collection(db, "transactions"), { ...trx, createdAt: new Date().toISOString() });
-      notify('Transaksi tersimpan di Cloud!', 'success');
-    } catch (e) { notify('Gagal simpan: ' + e.message, 'error'); }
+    // Validation
+    if (!trx.amount || isNaN(trx.amount) || trx.amount <= 0) {
+      return notify("Harap mengisi nominal transaksi dengan benar (Angka Positif)!", "error");
+    }
+    if (!trx.category || trx.category.trim() === "") {
+      return notify("Harap mengisi kategori transaksi!", "error");
+    }
+
+    await addDoc(collection(db, "transactions"), { ...trx, createdAt: new Date().toISOString() });
+    notify('Transaksi tersimpan!', 'success');
   };
 
   const deleteTransaction = async (id) => {
-    if(window.confirm('Hapus dari database?')) {
+    if(window.confirm('Hapus data ini?')) {
       await deleteDoc(doc(db, "transactions", id));
       notify('Transaksi dihapus', 'info');
     }
   };
 
-  const updateInventory = async (item) => {
-    await addDoc(collection(db, "inventory"), item);
-    notify('Stok tersimpan', 'success');
-  };
-
   const addSaving = async (sv) => {
+    // Validation
+    if (!sv.name || sv.name.trim() === "") {
+        return notify("Harap mengisi nama target tabungan!", "error");
+    }
+    if (!sv.target || isNaN(sv.target) || sv.target <= 0) {
+        return notify("Harap mengisi nominal target dengan benar!", "error");
+    }
+
     await addDoc(collection(db, "savings"), sv);
-    notify('Target tabungan dibuat', 'success');
+    notify('Target dibuat!', 'success');
   };
 
   const addDeposit = async (id, amount) => {
+    // Validation handled at UI level call, but good to have here too
+    if (!amount || isNaN(amount) || amount <= 0) {
+        return notify("Harap mengisi jumlah setoran dengan benar!", "error");
+    }
+
     const target = savings.find(s => s.id === id);
     if (target) {
       await updateDoc(doc(db, "savings", id), { current: target.current + amount });
@@ -221,6 +374,14 @@ const App = () => {
   };
 
   const applyLoan = async ({ amount, reason }) => {
+    // Validation
+    if (!amount || isNaN(amount) || amount <= 0) {
+        return notify("Harap mengisi jumlah pinjaman dengan benar!", "error");
+    }
+    if (!reason || reason.trim() === "") {
+        return notify("Harap mengisi alasan peminjaman!", "error");
+    }
+
     await addDoc(collection(db, "loans"), {
       amount, reason, status: 'Pending',
       date: new Date().toLocaleDateString('id-ID'),
@@ -230,6 +391,11 @@ const App = () => {
   };
 
   const buyInvestment = async (inv, amount) => {
+    // Validation
+    if (!amount || isNaN(amount) || amount < inv.minAmount) {
+        return notify(`Harap mengisi nominal investasi dengan benar (Min: ${formatRupiah(inv.minAmount)})!`, "error");
+    }
+
     await addDoc(collection(db, "my_investments"), {
       name: inv.name, amount, returnRate: inv.returnRate,
       startDate: new Date().toLocaleDateString('id-ID')
@@ -249,7 +415,7 @@ const App = () => {
     notify(`Status pinjaman: ${status}`, 'success');
   };
 
-  // --- AUTH PAGE ---
+  // --- AUTH PAGE RENDER ---
   if (!user) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden font-sans">
@@ -261,21 +427,31 @@ const App = () => {
         <div className="w-full max-w-md z-10 animate-in zoom-in duration-500">
           <div className="mb-8 flex justify-center scale-125"><Logo /></div>
           <Card className="border-t-4 border-t-cyan-500 bg-slate-900/80 backdrop-blur-xl">
-            <h2 className="text-2xl font-bold text-white mb-2 text-center">Login LifeFin</h2>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              const formData = new FormData(e.target);
-              setUser({ username: formData.get('username'), role: formData.get('role') });
-            }} className="space-y-4">
-              <Input name="username" label="Username" placeholder="Username" required />
-              <Input name="password" label="Password" type="password" placeholder="Password" required />
+            <h2 className="text-2xl font-bold text-white mb-2 text-center">
+              {isRegister ? 'Daftar Akun Baru' : 'Login LifeFin'}
+            </h2>
+            <form onSubmit={handleAuth} className="space-y-4">
+              <Input name="username" label="Username" placeholder="Masukkan username" />
+              <PasswordInput name="password" label="Password" placeholder="Masukkan password" />
               <div className="flex gap-4 mb-4 p-3 bg-slate-950 rounded-lg border border-slate-800">
                  <label className="flex-1 flex items-center justify-center gap-2 cursor-pointer p-2 rounded hover:bg-slate-900"><input type="radio" name="role" value="user" defaultChecked className="accent-cyan-500"/><span className="text-slate-300 text-sm font-medium">UMKM</span></label>
                  <div className="w-px bg-slate-800 h-6"></div>
                  <label className="flex-1 flex items-center justify-center gap-2 cursor-pointer p-2 rounded hover:bg-slate-900"><input type="radio" name="role" value="admin" className="accent-purple-500"/><span className="text-slate-300 text-sm font-medium">Admin</span></label>
               </div>
-              <Button type="submit" className="w-full py-3 text-lg shadow-xl shadow-cyan-900/20">Masuk Dashboard</Button>
+              <Button type="submit" disabled={authLoading} className="w-full py-3 text-lg shadow-xl shadow-cyan-900/20">
+                {authLoading ? 'Memproses...' : (isRegister ? 'Daftar Sekarang' : 'Masuk Dashboard')}
+              </Button>
             </form>
+            <div className="mt-6 text-center text-sm text-slate-500">
+              {isRegister ? 'Sudah punya akun?' : 'Belum punya akun?'} 
+              <button 
+                type="button"
+                onClick={() => setIsRegister(!isRegister)} 
+                className="text-cyan-400 font-bold ml-1 hover:text-cyan-300 transition-colors underline decoration-dotted"
+              >
+                {isRegister ? 'Login di sini' : 'Daftar Gratis'}
+              </button>
+            </div>
           </Card>
         </div>
       </div>
@@ -326,13 +502,11 @@ const App = () => {
   }
 
   // --- USER VIEW ---
-  // Dashboard Logic
   const totalIncome = transactions.filter(t => t.type === 'income').reduce((acc, curr) => acc + curr.amount, 0);
   const totalExpense = transactions.filter(t => t.type === 'expense').reduce((acc, curr) => acc + curr.amount, 0);
   const profit = totalIncome - totalExpense;
   const totalSavings = savings.reduce((acc, curr) => acc + curr.current, 0);
   
-  // Chart Data
   const chartData = Object.entries(transactions.reduce((acc, t) => {
     if (t.type === 'income') acc[t.date] = (acc[t.date] || 0) + t.amount;
     return acc;
@@ -441,8 +615,15 @@ const App = () => {
                  <h2 className="text-xl font-bold text-white">Tabungan Target</h2>
                  <Button onClick={() => {
                     const name = prompt('Nama Target:');
+                    if (!name) return; // Cancel or empty
                     const target = prompt('Jumlah Target (Rp):');
-                    if(name && target) addSaving({ name, target: parseInt(target), current: 0, deadline: new Date().toISOString() });
+                    
+                    // VALIDASI INPUT TARGET
+                    if (!target || isNaN(target) || parseInt(target) <= 0) {
+                        return notify('Harap mengisi nominal target dengan benar (angka positif)!', 'error');
+                    }
+
+                    addSaving({ name, target: parseInt(target), current: 0, deadline: new Date().toISOString() });
                  }}><Plus size={16}/> Baru</Button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -452,7 +633,11 @@ const App = () => {
                           <h3 className="font-bold text-white">{s.name}</h3>
                           <Button variant="secondary" className="py-1 px-2 text-xs" onClick={() => {
                              const amt = prompt('Jumlah Setor:');
-                             if(amt) addDeposit(s.id, parseInt(amt));
+                             // VALIDASI INPUT SETORAN
+                             if (!amt || isNaN(amt) || parseInt(amt) <= 0) {
+                                return notify('Harap mengisi jumlah setoran dengan benar (angka positif)!', 'error');
+                             }
+                             addDeposit(s.id, parseInt(amt));
                           }}>+ Setor</Button>
                        </div>
                        <div className="mb-2 flex justify-between text-sm"><span className="text-slate-300">{formatRupiah(s.current)}</span><span className="text-slate-500">of {formatRupiah(s.target)}</span></div>
@@ -471,6 +656,7 @@ const App = () => {
                  <form onSubmit={(e) => {
                     e.preventDefault();
                     const fd = new FormData(e.target);
+                    // Validation handled inside applyLoan function called here
                     applyLoan({ amount: parseInt(fd.get('amount')), reason: fd.get('reason') });
                     e.target.reset();
                  }} className="flex gap-4 items-end">
@@ -486,7 +672,15 @@ const App = () => {
                        <div className="text-sm text-slate-400 mb-4"><p>Return: <span className="text-green-400 font-bold">{inv.returnRate}%</span></p><p>Min: {formatRupiah(inv.minAmount)}</p></div>
                        <Button variant="outline" className="w-full text-sm" onClick={() => {
                           const amt = prompt(`Beli ${inv.name} senilai:`, inv.minAmount);
-                          if(amt && parseInt(amt) >= inv.minAmount) buyInvestment(inv, parseInt(amt));
+                          
+                          // VALIDASI INPUT INVESTASI
+                          if (!amt) return; // Cancel
+                          const val = parseInt(amt);
+                          if (isNaN(val) || val < inv.minAmount) {
+                             return notify(`Harap mengisi nominal dengan benar (Minimal: ${formatRupiah(inv.minAmount)})!`, 'error');
+                          }
+                          
+                          buyInvestment(inv, val);
                        }}>Investasi</Button>
                     </Card>
                  ))}
@@ -494,12 +688,24 @@ const App = () => {
            </div>
         )}
 
+        {/* --- EDUCATION PAGE (UPDATED) --- */}
         {activePage === 'education' && (
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in zoom-in">
-              {['Manajemen Keuangan Dasar', 'Strategi Pemasaran Digital'].map((title, i) => (
-                 <Card key={i} className="group cursor-pointer hover:border-blue-500/50 transition-colors">
-                    <div className="aspect-video bg-blue-500/10 rounded-lg flex items-center justify-center mb-4"><PlayCircle size={48} className="text-blue-500 opacity-80"/></div>
-                    <h3 className="text-white font-bold text-lg">{title}</h3>
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in zoom-in">
+              {EDUCATION_CONTENT.map((item) => (
+                 <Card 
+                    key={item.id} 
+                    className="group cursor-pointer hover:border-blue-500/50 transition-colors hover:bg-slate-900/80"
+                 >
+                    <a href={item.url} target="_blank" rel="noopener noreferrer" className="block h-full">
+                        <div className="aspect-video bg-blue-500/10 rounded-lg flex items-center justify-center mb-4 group-hover:scale-[1.02] transition-transform relative">
+                            <PlayCircle size={48} className="text-blue-500 opacity-80 group-hover:text-blue-400 group-hover:opacity-100 z-10"/>
+                            <div className="absolute top-2 right-2 bg-black/50 px-2 py-1 rounded text-[10px] text-white flex items-center gap-1">
+                               <ExternalLink size={10} /> YouTube
+                            </div>
+                        </div>
+                        <h3 className="text-white font-bold text-lg mb-2 group-hover:text-blue-400 transition-colors leading-tight">{item.title}</h3>
+                        <p className="text-slate-400 text-sm line-clamp-3">{item.desc}</p>
+                    </a>
                  </Card>
               ))}
            </div>

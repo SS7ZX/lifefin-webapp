@@ -1,12 +1,8 @@
-// Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
-import { db } from './fire';
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
+import { getFirestore } from "firebase/firestore";
 
-// Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyBEBJOtvbESS5aQOTEQI0jrfauqeTtORts",
+  apiKey: "AIzaSyBEBJ0tvBESS5aQOTEQI0jrfauqeTt0rts",
   authDomain: "lifefin.firebaseapp.com",
   projectId: "lifefin",
   storageBucket: "lifefin.firebasestorage.app",
@@ -16,3 +12,6 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
+
+// Initialize Firestore & Export LANGSUNG (Biar gak error re-export)
+export const db = getFirestore(app);
