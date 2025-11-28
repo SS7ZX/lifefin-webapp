@@ -16,7 +16,7 @@ import {
 import { 
   LayoutDashboard, Wallet, PiggyBank, BookOpen, LogOut, 
   Plus, CreditCard, PlayCircle, CheckCircle, XCircle, 
-  AlertCircle, Trash2, Eye, EyeOff, ExternalLink, ShieldCheck
+  AlertCircle, Trash2, Eye, EyeOff, ExternalLink, ShieldAlert
 } from 'lucide-react';
 
 /**
@@ -187,6 +187,9 @@ const App = () => {
   
   const [isRegister, setIsRegister] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
+  
+  // NEW: Demo Mode State
+  const [isDemoMode, setIsDemoMode] = useState(false);
 
   const [transactions, setTransactions] = useState([]);
   const [savings, setSavings] = useState([]);
@@ -200,12 +203,11 @@ const App = () => {
   };
   const removeToast = (id) => setToasts(prev => prev.filter(t => t.id !== id));
 
-  // --- FIREBASE LISTENERS ---
+  // --- FIREBASE LISTENERS (Only if NOT Demo Mode) ---
   useEffect(() => {
-    if (!user) return; // Hanya jalankan jika login sukses
+    if (!user || isDemoMode) return; // Skip if offline demo
 
     try {
-      // Menggunakan query sederhana (orderBy) yang biasanya aman
       const qTrx = query(collection(db, "transactions"), orderBy("createdAt", "desc"));
       const unsubTrx = onSnapshot(qTrx, (snap) => setTransactions(snap.docs.map(d => ({ ...d.data(), id: d.id }))), (err) => console.log("Trx Error:", err));
       
@@ -217,9 +219,9 @@ const App = () => {
     } catch (e) {
       console.log("Error init listeners:", e);
     }
-  }, [user]);
+  }, [user, isDemoMode]);
 
-  // --- AUTH ACTIONS (THE REAL PROPER FIX) ---
+  // --- AUTH ACTIONS ---
   const handleAuth = async (e) => {
     e.preventDefault();
     setAuthLoading(true);
@@ -237,7 +239,6 @@ const App = () => {
       const usersRef = collection(db, 'users');
       
       if (isRegister) {
-        // REGISTER: Cek apakah username ada?
         const q = query(usersRef, where('username', '==', username));
         const snap = await getDocs(q);
         
@@ -245,13 +246,10 @@ const App = () => {
           throw new Error('Username sudah terpakai!');
         }
 
-        // Simpan user baru
         await addDoc(usersRef, { username, password, role, createdAt: new Date().toISOString() });
         notify('Registrasi Berhasil! Silakan Login.', 'success');
         setIsRegister(false);
       } else {
-        // LOGIN PROPER (ANTI-STUCK):
-        // 1. Cari berdasarkan Username SAJA (Ringan, tidak butuh index majemuk)
         const q = query(usersRef, where('username', '==', username));
         const snap = await getDocs(q);
 
@@ -259,20 +257,15 @@ const App = () => {
           throw new Error('Username tidak ditemukan! Silakan daftar.');
         }
 
-        // 2. Ambil data user dari database
         const userData = snap.docs[0].data();
-
-        // 3. Cek Password & Role di sisi Aplikasi (JAVASCRIPT)
-        // Ini menghindari error index di Firebase
         if (userData.password !== password) {
            throw new Error('Password salah!');
         }
-        
         if (userData.role !== role) {
            throw new Error(`Akun ini terdaftar sebagai ${userData.role}, bukan ${role}!`);
         }
 
-        // 4. Jika lolos semua pengecekan
+        setIsDemoMode(false); // Reset demo mode
         setUser({ username, role });
         notify(`Login Sukses! Halo, ${username}`, 'success');
       }
@@ -284,49 +277,107 @@ const App = () => {
     }
   };
 
-  // --- APP ACTIONS WITH VALIDATION ---
+  // --- DEMO MODE LOGIN ---
+  const handleDemoLogin = () => {
+    if(window.confirm("Masuk Mode Demo? Data tidak akan tersimpan ke server Google.")) {
+      setIsDemoMode(true);
+      setUser({ username: "Tamu Demo", role: "user" });
+      // Seed Data Dummy biar gak kosong pas presentasi
+      setTransactions([{id:'d1', amount:500000, category:'Penjualan Demo', type:'income', date: new Date().toISOString(), createdAt: new Date().toISOString()}]);
+      setSavings([{id:'d1', name:'Tabungan Demo', target:1000000, current:250000}]);
+      notify("Masuk Mode Demo (Offline)", "info");
+    }
+  };
+
+  // --- APP ACTIONS WITH VALIDATION & DEMO CHECK ---
   const addTransaction = async (trx) => {
     if (!trx.amount || isNaN(trx.amount) || trx.amount <= 0) return notify("Nominal harus positif!", "error");
     if (!trx.category) return notify("Kategori wajib diisi!", "error");
-    await addDoc(collection(db, "transactions"), { ...trx, createdAt: new Date().toISOString() });
-    notify('Transaksi tersimpan!', 'success');
+    
+    if (isDemoMode) {
+      setTransactions(prev => [{...trx, id: Date.now().toString()}, ...prev]);
+      notify('Transaksi tersimpan (Demo)!', 'success');
+    } else {
+      await addDoc(collection(db, "transactions"), { ...trx, createdAt: new Date().toISOString() });
+      notify('Transaksi tersimpan!', 'success');
+    }
   };
 
   const deleteTransaction = async (id) => {
-    if(window.confirm('Hapus data ini?')) { await deleteDoc(doc(db, "transactions", id)); notify('Terhapus!', 'info'); }
+    if(!window.confirm('Hapus data ini?')) return;
+    
+    if (isDemoMode) {
+      setTransactions(prev => prev.filter(t => t.id !== id));
+      notify('Terhapus (Demo)!', 'info');
+    } else {
+      await deleteDoc(doc(db, "transactions", id)); 
+      notify('Terhapus!', 'info');
+    }
   };
 
   const addSaving = async (sv) => {
     if (!sv.name) return notify("Nama target wajib diisi!", "error");
     if (!sv.target || sv.target <= 0) return notify("Target harus positif!", "error");
-    await addDoc(collection(db, "savings"), sv); notify('Target dibuat!', 'success');
+    
+    if (isDemoMode) {
+      setSavings(prev => [...prev, {...sv, id: Date.now().toString()}]);
+      notify('Target dibuat (Demo)!', 'success');
+    } else {
+      await addDoc(collection(db, "savings"), sv); notify('Target dibuat!', 'success');
+    }
   };
 
   const addDeposit = async (id, amount) => {
     if (!amount || amount <= 0) return notify("Setoran harus positif!", "error");
-    const target = savings.find(s => s.id === id);
-    if (target) {
-      await updateDoc(doc(db, "savings", id), { current: target.current + amount });
-      await addTransaction({ date: new Date().toISOString().split('T')[0], type: 'expense', category: 'Tabungan', amount: amount, note: `Setor ke ${target.name}` });
-      notify('Berhasil setor!', 'success');
+    
+    if (isDemoMode) {
+      setSavings(prev => prev.map(s => s.id === id ? {...s, current: s.current + amount} : s));
+      notify('Berhasil setor (Demo)!', 'success');
+    } else {
+      const target = savings.find(s => s.id === id);
+      if (target) {
+        await updateDoc(doc(db, "savings", id), { current: target.current + amount });
+        await addTransaction({ date: new Date().toISOString().split('T')[0], type: 'expense', category: 'Tabungan', amount: amount, note: `Setor ke ${target.name}` });
+        notify('Berhasil setor!', 'success');
+      }
     }
   };
 
   const applyLoan = async ({ amount, reason }) => {
     if (!amount || amount <= 0) return notify("Jumlah harus positif!", "error");
     if (!reason) return notify("Alasan wajib diisi!", "error");
-    await addDoc(collection(db, "loans"), { amount, reason, status: 'Pending', date: new Date().toLocaleDateString('id-ID'), userName: user.username, userScore: 780 });
-    notify('Pengajuan terkirim!', 'success');
+    
+    if (isDemoMode) {
+      setLoans(prev => [...prev, { id: Date.now().toString(), amount, reason, status: 'Pending', date: new Date().toLocaleDateString(), userName: user.username }]);
+      notify('Pengajuan terkirim (Demo)!', 'success');
+    } else {
+      await addDoc(collection(db, "loans"), { amount, reason, status: 'Pending', date: new Date().toLocaleDateString('id-ID'), userName: user.username, userScore: 780 });
+      notify('Pengajuan terkirim!', 'success');
+    }
   };
 
   const buyInvestment = async (inv, amount) => {
     if (!amount || amount < inv.minAmount) return notify(`Minimal investasi ${formatRupiah(inv.minAmount)}!`, "error");
-    await addDoc(collection(db, "my_investments"), { name: inv.name, amount, returnRate: inv.returnRate, startDate: new Date().toLocaleDateString('id-ID') });
-    await addTransaction({ date: new Date().toISOString().split('T')[0], type: 'expense', category: 'Investasi', amount: amount, note: `Beli ${inv.name}` });
-    notify('Investasi berhasil!', 'success');
+    
+    if (isDemoMode) {
+      setMyInvestments(prev => [...prev, { id: Date.now().toString(), name: inv.name, amount, returnRate: inv.returnRate, startDate: new Date().toLocaleDateString() }]);
+      notify('Investasi berhasil (Demo)!', 'success');
+    } else {
+      await addDoc(collection(db, "my_investments"), { name: inv.name, amount, returnRate: inv.returnRate, startDate: new Date().toLocaleDateString('id-ID') });
+      await addTransaction({ date: new Date().toISOString().split('T')[0], type: 'expense', category: 'Investasi', amount: amount, note: `Beli ${inv.name}` });
+      notify('Investasi berhasil!', 'success');
+    }
   };
 
-  const handleLoanAction = async (id, status) => { await updateDoc(doc(db, "loans", id), { status }); notify(`Status: ${status}`, 'success'); };
+  const handleLoanAction = async (id, status) => { 
+    if (isDemoMode) {
+      setLoans(prev => prev.map(l => l.id === id ? {...l, status} : l));
+      notify(`Status: ${status} (Demo)`, 'success');
+    } else {
+      await updateDoc(doc(db, "loans", id), { status }); 
+      notify(`Status: ${status}`, 'success'); 
+    }
+  };
 
   // --- RENDER ---
   if (!user) {
@@ -339,6 +390,7 @@ const App = () => {
         <div className="w-full max-w-md z-10 animate-in zoom-in duration-500">
           <div className="mb-8 flex justify-center scale-125"><Logo /></div>
           <Card className="border-t-4 border-t-cyan-500 bg-slate-900/80 backdrop-blur-xl relative">
+            {/* VERSI KHUSUS */}
             <div className="absolute top-2 right-2 text-[10px] text-slate-600 bg-slate-900 px-2 py-1 rounded border border-slate-800">
               v1.29.25.12
             </div>
@@ -357,6 +409,18 @@ const App = () => {
               </Button>
             </form>
             
+            {/* TOMBOL DARURAT / DEMO MODE */}
+            <div className="mt-4 pt-4 border-t border-slate-800">
+               <button 
+                 type="button"
+                 onClick={handleDemoLogin}
+                 className="w-full flex items-center justify-center gap-2 text-yellow-500 hover:text-yellow-400 text-sm font-bold bg-yellow-500/10 py-2 rounded-lg hover:bg-yellow-500/20 transition-all border border-yellow-500/30"
+               >
+                 <ShieldAlert size={16}/> Masuk Mode Demo (Tanpa Database)
+               </button>
+               <p className="text-[10px] text-slate-500 text-center mt-2">Gunakan tombol di atas jika koneksi Database sedang bermasalah.</p>
+            </div>
+
             <div className="mt-4 text-center text-sm text-slate-500">
               {isRegister ? 'Sudah punya akun?' : 'Belum punya akun?'} 
               <button type="button" onClick={() => setIsRegister(!isRegister)} className="text-cyan-400 font-bold ml-1 hover:text-cyan-300 transition-colors underline decoration-dotted">
@@ -382,11 +446,12 @@ const App = () => {
           ))}
         </nav>
         <div className="p-4 border-t border-slate-800">
+           {isDemoMode && <div className="mb-2 px-2 py-1 bg-yellow-500/10 text-yellow-500 text-xs text-center rounded border border-yellow-500/30 font-bold">MODE DEMO</div>}
            <button onClick={() => setUser(null)} className="w-full flex items-center justify-center lg:justify-start gap-3 text-slate-500 hover:text-red-400 p-2 rounded-lg hover:bg-red-500/10"><LogOut size={20} /><span className="hidden lg:inline font-medium">Keluar</span></button>
         </div>
       </aside>
       <main className="flex-1 md:ml-20 lg:ml-64 p-4 lg:p-8 max-w-7xl mx-auto w-full mb-20 md:mb-0">
-        <header className="mb-8 hidden md:block"><h1 className="text-3xl font-bold text-white mb-1 capitalize">{activePage}</h1><p className="text-slate-400 text-sm">LifeFin System v4.0 (Live Connected)</p></header>
+        <header className="mb-8 hidden md:block"><h1 className="text-3xl font-bold text-white mb-1 capitalize">{activePage}</h1><p className="text-slate-400 text-sm">LifeFin v1.29.25.12 {isDemoMode ? '(OFFLINE DEMO)' : '(Connected)'}</p></header>
         {activePage === 'dashboard' && <div className="space-y-6 animate-in fade-in"><div className="grid grid-cols-1 md:grid-cols-4 gap-4"><Card className="border-l-4 border-l-cyan-500"><div>Total Omzet</div><div className="text-2xl font-bold text-white">{formatRupiah(transactions.filter(t=>t.type==='income').reduce((a,c)=>a+c.amount,0))}</div></Card><Card className="border-l-4 border-l-green-500"><div>Laba Bersih</div><div className="text-2xl font-bold text-green-400">{formatRupiah(transactions.filter(t=>t.type==='income').reduce((a,c)=>a+c.amount,0) - transactions.filter(t=>t.type==='expense').reduce((a,c)=>a+c.amount,0))}</div></Card><Card className="border-l-4 border-l-purple-500"><div>Tabungan</div><div className="text-2xl font-bold text-white">{formatRupiah(savings.reduce((a,c)=>a+c.current,0))}</div></Card><Card><div>Skor Kredit</div><div className="text-3xl font-black text-blue-400">780</div></Card></div><div className="grid grid-cols-1 lg:grid-cols-3 gap-6"><Card title="Aktivitas" className="lg:col-span-3"><div className="space-y-3">{transactions.slice(0,5).map(t=><div key={t.id} className="flex justify-between p-3 bg-slate-950 rounded border border-slate-800"><div>{t.category}</div><div className={t.type==='income'?'text-green-400':'text-red-400'}>{formatRupiah(t.amount)}</div></div>)}</div></Card></div></div>}
         {activePage === 'pos' && <div className="grid grid-cols-1 lg:grid-cols-3 gap-6"><div className="lg:col-span-2"><Card title="Input Transaksi"><form onSubmit={e=>{e.preventDefault();const fd=new FormData(e.target);addTransaction({amount:parseInt(fd.get('amount')),category:fd.get('category'),type:fd.get('type'),date:new Date().toISOString().split('T')[0],note:fd.get('note')});e.target.reset();}} className="space-y-4 mt-4"><div className="grid grid-cols-2 gap-4"><label className="cursor-pointer"><input type="radio" name="type" value="income" defaultChecked className="peer hidden"/><div className="p-4 rounded-xl border border-slate-700 text-center peer-checked:bg-green-500/10 peer-checked:border-green-500 peer-checked:text-green-400 text-slate-500 font-bold">Pemasukan</div></label><label className="cursor-pointer"><input type="radio" name="type" value="expense" className="peer hidden"/><div className="p-4 rounded-xl border border-slate-700 text-center peer-checked:bg-red-500/10 peer-checked:border-red-500 peer-checked:text-red-400 text-slate-500 font-bold">Pengeluaran</div></label></div><Input name="amount" label="Nominal" type="number" placeholder="0" required/><Input name="category" label="Kategori" placeholder="Contoh: Nasi Goreng" required/><Input name="note" label="Catatan" placeholder="Opsional"/><Button type="submit" className="w-full">Simpan</Button></form></Card></div><Card title="Riwayat">{transactions.map(t=><div key={t.id} className="flex justify-between items-center p-3 rounded border border-slate-800 bg-slate-950/50 mb-2"><div><p className="text-white text-sm">{t.category}</p><p className="text-xs text-slate-500">{formatRupiah(t.amount)}</p></div><button onClick={()=>deleteTransaction(t.id)} className="text-slate-600 hover:text-red-400"><Trash2 size={16}/></button></div>)}</Card></div>}
         {activePage === 'savings' && <div className="space-y-6"><div className="flex justify-between items-center"><h2 className="text-xl font-bold text-white">Tabungan Target</h2><Button onClick={()=>{const n=prompt('Nama Target:');if(!n)return;const t=prompt('Target (Rp):');if(!t||t<=0)return notify("Target salah!","error");addSaving({name:n,target:parseInt(t),current:0,deadline:new Date().toISOString()})}}><Plus size={16}/> Baru</Button></div><div className="grid grid-cols-1 md:grid-cols-3 gap-4">{savings.map(s=><Card key={s.id}><div className="flex justify-between mb-4"><h3 className="font-bold text-white">{s.name}</h3><Button variant="secondary" className="py-1 px-2 text-xs" onClick={()=>{const a=prompt('Jumlah Setor:');if(!a||a<=0)return notify("Salah!","error");addDeposit(s.id,parseInt(a))}}>+ Setor</Button></div><div className="mb-2 flex justify-between text-sm"><span className="text-slate-300">{formatRupiah(s.current)}</span><span className="text-slate-500">of {formatRupiah(s.target)}</span></div><div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden"><div className="bg-gradient-to-r from-cyan-500 to-purple-600 h-3 rounded-full" style={{width:`${Math.min((s.current/s.target)*100,100)}%`}}></div></div></Card>)}</div></div>}
