@@ -20,7 +20,7 @@ import {
   QrCode, Smartphone, Banknote, Landmark, Camera, ScanLine, 
   TrendingUp, Coins, Loader2, Store, ShoppingBag, Briefcase,
   Settings, Users, Activity, FileText, CheckSquare, ArrowLeft, User, BarChart,
-  ArrowDownCircle, ArrowUpCircle, Download 
+  ArrowDownCircle, ArrowUpCircle, Download, AlertTriangle
 } from 'lucide-react';
 
 /**
@@ -119,16 +119,13 @@ const Button = ({ children, onClick, variant = 'primary', className = '', disabl
   );
 };
 
-// Enhanced Card with Decoration Support
 const Card = ({ children, className = '', title, icon: Icon, decorationIcon: DecIcon }) => (
   <div className={`bg-slate-900/80 backdrop-blur-sm border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden group ${className}`}>
-    {/* Background Decoration Icon (Watermark) */}
     {DecIcon && (
         <div className="absolute -bottom-6 -right-6 text-slate-800 opacity-50 group-hover:scale-110 group-hover:text-slate-700 transition-all duration-500 pointer-events-none">
             <DecIcon size={100} strokeWidth={1} />
         </div>
     )}
-
     {(title || Icon) && (
       <div className="flex justify-between items-start mb-4 relative z-10">
         <div className="flex items-center gap-2">
@@ -137,9 +134,7 @@ const Card = ({ children, className = '', title, icon: Icon, decorationIcon: Dec
         </div>
       </div>
     )}
-    <div className="relative z-10">
-        {children}
-    </div>
+    <div className="relative z-10">{children}</div>
   </div>
 );
 
@@ -156,21 +151,8 @@ const PasswordInput = ({ label, value, onChange, placeholder, name }) => {
     <div className="mb-4">
       {label && <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">{label}</label>}
       <div className="relative">
-        <input 
-          name={name}
-          type={show ? "text" : "password"} 
-          value={value} 
-          onChange={onChange} 
-          placeholder={placeholder} 
-          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors placeholder:text-slate-600 pr-10" 
-        />
-        <button 
-          type="button"
-          onClick={() => setShow(!show)}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-cyan-400 transition-colors"
-        >
-          {show ? <EyeOff size={18} /> : <Eye size={18} />}
-        </button>
+        <input name={name} type={show ? "text" : "password"} value={value} onChange={onChange} placeholder={placeholder} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors placeholder:text-slate-600 pr-10" />
+        <button type="button" onClick={() => setShow(!show)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-cyan-400 transition-colors">{show ? <EyeOff size={18} /> : <Eye size={18} />}</button>
       </div>
     </div>
   );
@@ -265,10 +247,7 @@ const QrisScannerModal = ({ onScanComplete, onClose }) => {
         {isCameraActive ? <video ref={videoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover opacity-80"></video> : <div className="absolute inset-0 bg-gradient-to-b from-gray-800 to-gray-900 flex items-center justify-center"><p className="text-gray-500 text-sm">Simulasi Kamera...</p></div>}
         <div className="relative w-64 h-64 border-2 border-cyan-400/50 rounded-3xl z-10 overflow-hidden shadow-[0_0_100px_rgba(34,211,238,0.2)]">
            <div className="absolute top-0 left-0 w-full h-1 bg-cyan-400 shadow-[0_0_20px_rgba(34,211,238,1)] animate-[scan_2s_infinite_linear]"></div>
-           <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-cyan-400 rounded-tl-xl"></div>
-           <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-cyan-400 rounded-tr-xl"></div>
-           <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-cyan-400 rounded-bl-xl"></div>
-           <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-cyan-400 rounded-br-xl"></div>
+           {/* Decoration */}
         </div>
         <div className="absolute bottom-32 text-center w-full z-10">
            {scanStatus === 'searching' ? <div className="inline-flex items-center gap-2 bg-black/60 px-4 py-2 rounded-full text-cyan-400 text-sm font-medium animate-pulse"><ScanLine size={16}/> Mencari kode LPay...</div> : <div className="inline-flex items-center gap-2 bg-green-500 px-6 py-2 rounded-full text-white text-base font-bold animate-in zoom-in"><CheckCircle size={20}/> LPay Ditemukan!</div>}
@@ -409,7 +388,7 @@ const App = () => {
   const [loans, setLoans] = useState([]);
   const [myInvestments, setMyInvestments] = useState([]);
 
-  // Credit Score Config (Mock State)
+  // Credit Score Config
   const [scoreConfig, setScoreConfig] = useState({ base: 300, trxWeight: 1, savingWeight: 50 });
 
   const notify = (message, type = 'info') => {
@@ -423,7 +402,6 @@ const App = () => {
   useEffect(() => {
     if (!user || isDemoMode) return;
 
-    // Fetch Users List for Admin (Monitoring)
     let unsubUsers = () => {};
     if (user.role === 'admin') {
       unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
@@ -459,38 +437,20 @@ const App = () => {
     e.preventDefault();
     setAuthLoading(true);
 
-    // --- OTP VERIFICATION FLOW ---
     if (showOtp && isRegister) {
         if (otpInput !== serverOtp) {
             setAuthLoading(false);
             return notify('Kode OTP salah! Coba lagi.', 'error');
         }
-        
-        // OTP Verified - Create User
         try {
             const usersRef = collection(db, 'users');
-            await addDoc(usersRef, { 
-                username: tempRegData.username, 
-                password: tempRegData.password, 
-                role: tempRegData.role, 
-                createdAt: new Date().toISOString() 
-            });
+            await addDoc(usersRef, { username: tempRegData.username, password: tempRegData.password, role: tempRegData.role, createdAt: new Date().toISOString() });
             notify('Verifikasi Berhasil! Silakan Login.', 'success');
-            
-            // Reset
-            setIsRegister(false);
-            setShowOtp(false);
-            setOtpInput('');
-            setTempRegData(null);
-        } catch (err) {
-            notify(err.message, 'error');
-        } finally {
-            setAuthLoading(false);
-        }
+            setIsRegister(false); setShowOtp(false); setOtpInput(''); setTempRegData(null);
+        } catch (err) { notify(err.message, 'error'); } finally { setAuthLoading(false); }
         return;
     }
 
-    // --- NORMAL AUTH FLOW ---
     const formData = new FormData(e.target);
     const username = formData.get('username');
     const password = formData.get('password');
@@ -501,7 +461,6 @@ const App = () => {
       return notify('Username dan Password wajib diisi!', 'error');
     }
 
-    // --- PASSWORD LENGTH VALIDATION ---
     if (password.length < 8) {
         setAuthLoading(false);
         return notify('Password harus minimal 8 karakter!', 'error');
@@ -515,20 +474,12 @@ const App = () => {
         const snap = await getDocs(q);
         if (!snap.empty) throw new Error('Username sudah terpakai!');
 
-        // --- START OTP SIMULATION ---
         const code = Math.floor(1000 + Math.random() * 9000).toString();
         setServerOtp(code);
         setTempRegData({ username, password, role });
-        
-        // Simulate sending SMS
-        setTimeout(() => {
-            alert(`[SMS LifeFin] Kode OTP Anda: ${code}`);
-        }, 500); 
-        
+        setTimeout(() => { alert(`[SMS LifeFin] Kode OTP Anda: ${code}`); }, 500); 
         setShowOtp(true);
         notify('Kode OTP dikirim ke perangkat Anda.', 'info');
-        // -----------------------------
-
       } else {
         const q = query(usersRef, where('username', '==', username)); const snap = await getDocs(q);
         if (snap.empty) throw new Error('Username tidak ditemukan!');
@@ -624,14 +575,12 @@ const App = () => {
   };
 
   const applyLoan = async ({ amount, reason }) => { if (!amount || amount <= 0) return notify("Jumlah salah!", "error"); const data = { amount, reason, status: 'Pending', date: new Date().toLocaleDateString('id-ID'), userName: user.username, userScore: 780 }; if (isDemoMode) { setLoans(prev=>[...prev, {...data, id: Date.now().toString()}]); } else { await addDoc(collection(db, "loans"), data); } notify('Pengajuan terkirim!', 'success'); };
-  
   const handleBuyInvestment = async (product, amount) => { 
       const invData = { name: product.name, amount, returnRate: product.returnRate, risk: product.risk, startDate: new Date().toLocaleDateString('id-ID'), userName: user.username };
       if (isDemoMode) { setMyInvestments(prev=>[...prev, {id: Date.now().toString(), ...invData}]); } 
       else { await addDoc(collection(db, "my_investments"), invData); await addTransactionFn({ date: new Date().toISOString().split('T')[0], type: 'expense', category: 'Investasi', amount: amount, note: `Beli ${product.name}`, paymentMethod: 'auto-debit', paymentProvider: '-', transferStatus: 'Berhasil' }); } 
       notify('Investasi berhasil!', 'success'); 
   };
-
   const handleLoanAction = async (id, status) => { if (isDemoMode) { setLoans(prev=>prev.map(l=>l.id===id?{...l,status}:l)); } else { await updateDoc(doc(db, "loans", id), { status }); } notify(`Status: ${status}`, 'success'); };
 
   // --- USER SCORE CALCULATION ---
@@ -704,11 +653,13 @@ const App = () => {
     );
   }
 
-  // --- ADMIN VIEW ---
+  // --- ADMIN VIEW (NEW REVISED LAYOUT) ---
   if (user.role === 'admin') {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-200 font-sans flex">
         <ToastContainer toasts={toasts} removeToast={removeToast} />
+        
+        {/* Admin Sidebar */}
         <aside className="w-20 lg:w-64 bg-slate-900 border-r border-slate-800 fixed h-full z-20 hidden md:flex flex-col">
           <div className="p-6 flex justify-center lg:justify-start h-20 items-center"><div className="lg:hidden"><Logo size="text-xl"/></div><div className="hidden lg:block"><Logo/></div></div>
           <div className="px-6 mb-2"><span className="bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded text-[10px] font-bold border border-purple-500/50 uppercase tracking-wider">Admin Portal</span></div>
@@ -722,37 +673,116 @@ const App = () => {
           <div className="p-4 border-t border-slate-800"><button onClick={() => setUser(null)} className="w-full flex items-center justify-center lg:justify-start gap-3 text-slate-500 hover:text-red-400 p-2 rounded-lg hover:bg-red-500/10"><LogOut size={20} /><span className="hidden lg:inline font-medium">Keluar</span></button></div>
         </aside>
         
+        {/* Admin Content */}
         <main className="flex-1 md:ml-20 lg:ml-64 p-4 lg:p-8 max-w-7xl mx-auto w-full mb-20 md:mb-0">
            <header className="mb-8 hidden md:block"><h1 className="text-3xl font-bold text-white mb-1 capitalize">{ADMIN_NAV_ITEMS.find(i=>i.id===adminTab)?.label}</h1><p className="text-slate-400 text-sm">Admin Control Panel</p></header>
            
+           {/* TAB: APPROVAL */}
            {adminTab === 'admin_approval' && (
              <div className="space-y-6 animate-in fade-in">
                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Card className="bg-slate-800 border-l-4 border-l-yellow-500"><h3 className="text-slate-400 text-xs font-bold uppercase">Menunggu Persetujuan</h3><p className="text-3xl font-bold text-yellow-400 mt-2">{loans.filter(l => l.status === 'Pending').length}</p></Card>
-                  <Card className="bg-slate-800 border-l-4 border-l-green-500"><h3 className="text-slate-400 text-xs font-bold uppercase">Total Disetujui</h3><p className="text-3xl font-bold text-green-400 mt-2">{loans.filter(l => l.status === 'Approved').length}</p></Card>
+                  <Card className="bg-slate-800 border-l-4 border-l-yellow-500">
+                     <h3 className="text-slate-400 text-xs font-bold uppercase">Menunggu Persetujuan</h3>
+                     <p className="text-3xl font-bold text-yellow-400 mt-2">{loans.filter(l => l.status === 'Pending').length}</p>
+                  </Card>
+                  <Card className="bg-slate-800 border-l-4 border-l-green-500">
+                     <h3 className="text-slate-400 text-xs font-bold uppercase">Total Disetujui</h3>
+                     <p className="text-3xl font-bold text-green-400 mt-2">{loans.filter(l => l.status === 'Approved').length}</p>
+                  </Card>
                </div>
-               <Card title="Antrian Pengajuan Pinjaman"><div className="overflow-x-auto mt-4"><table className="w-full text-left text-sm text-slate-400"><thead className="bg-slate-950 text-slate-200 uppercase font-bold text-xs"><tr><th className="px-4 py-3">User</th><th className="px-4 py-3">Jumlah</th><th className="px-4 py-3">Skor</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Aksi</th></tr></thead><tbody className="divide-y divide-slate-800">{loans.map(loan => (<tr key={loan.id} className="hover:bg-slate-800/50"><td className="px-4 py-4 text-white font-medium">{loan.userName}<div className="text-xs text-slate-500">{loan.date}</div></td><td className="px-4 py-4">{formatRupiah(loan.amount)}</td><td className="px-4 py-4"><span className="bg-blue-500/10 text-blue-400 px-2 py-1 rounded font-bold">{loan.userScore}</span></td><td className="px-4 py-4"><span className={`px-2 py-1 rounded text-xs font-bold uppercase ${loan.status === 'Approved' ? 'bg-green-500/20 text-green-400' : loan.status === 'Rejected' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{loan.status}</span></td><td className="px-4 py-4 flex justify-end gap-2">{loan.status === 'Pending' && <><button onClick={() => handleLoanAction(loan.id, 'Approved')} className="bg-green-600 p-1.5 rounded-md text-white hover:bg-green-500"><CheckCircle size={16}/></button><button onClick={() => handleLoanAction(loan.id, 'Rejected')} className="bg-red-600 p-1.5 rounded-md text-white hover:bg-red-500"><XCircle size={16}/></button></>}</td></tr>))}</tbody></table></div></Card>
+               <Card title="Antrian Pengajuan Pinjaman">
+                  <div className="overflow-x-auto mt-4">
+                    <table className="w-full text-left text-sm text-slate-400">
+                      <thead className="bg-slate-950 text-slate-200 uppercase font-bold text-xs"><tr><th className="px-4 py-3">User</th><th className="px-4 py-3">Jumlah</th><th className="px-4 py-3">Skor</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Aksi</th></tr></thead>
+                      <tbody className="divide-y divide-slate-800">
+                        {loans.map(loan => (
+                          <tr key={loan.id} className="hover:bg-slate-800/50">
+                            <td className="px-4 py-4 text-white font-medium">{loan.userName}<div className="text-xs text-slate-500">{loan.date}</div></td>
+                            <td className="px-4 py-4">{formatRupiah(loan.amount)}</td>
+                            <td className="px-4 py-4"><span className="bg-blue-500/10 text-blue-400 px-2 py-1 rounded font-bold">{loan.userScore}</span></td>
+                            <td className="px-4 py-4"><span className={`px-2 py-1 rounded text-xs font-bold uppercase ${loan.status === 'Approved' ? 'bg-green-500/20 text-green-400' : loan.status === 'Rejected' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{loan.status}</span></td>
+                            <td className="px-4 py-4 flex justify-end gap-2">
+                              {loan.status === 'Pending' && <><button onClick={() => handleLoanAction(loan.id, 'Approved')} className="bg-green-600 p-1.5 rounded-md text-white hover:bg-green-500"><CheckCircle size={16}/></button><button onClick={() => handleLoanAction(loan.id, 'Rejected')} className="bg-red-600 p-1.5 rounded-md text-white hover:bg-red-500"><XCircle size={16}/></button></>}
+                            </td>
+                          </tr>
+                        ))}
+                        {loans.length === 0 && <tr><td colSpan="5" className="text-center py-8 italic">Tidak ada pengajuan baru.</td></tr>}
+                      </tbody>
+                    </table>
+                  </div>
+               </Card>
              </div>
            )}
 
+           {/* TAB: MONITORING UMKM (UPDATED) */}
            {adminTab === 'admin_monitoring' && (
               <div className="space-y-6 animate-in fade-in">
                  {!selectedUmkm ? (
-                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    <>
+                      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
                         {usersList.filter(u => u.role === 'user').map(u => (
                           <div key={u.id} onClick={() => setSelectedUmkm(u)} className="bg-slate-900 border border-slate-800 p-6 rounded-xl hover:border-purple-500/50 cursor-pointer transition-all group">
-                             <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center mb-4 group-hover:bg-purple-500/20 group-hover:text-purple-400 transition-colors"><User size={24} className="text-slate-400 group-hover:text-purple-400"/></div>
-                             <h3 className="text-white font-bold text-lg truncate">{u.username}</h3><p className="text-xs text-slate-500 mt-1">UMKM Terdaftar</p>
+                             <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center mb-4 group-hover:bg-purple-500/20 group-hover:text-purple-400 transition-colors">
+                                <User size={24} className="text-slate-400 group-hover:text-purple-400"/>
+                             </div>
+                             <h3 className="text-white font-bold text-lg truncate">{u.username}</h3>
+                             <p className="text-xs text-slate-500 mt-1">UMKM Terdaftar</p>
                              <div className="mt-4 text-xs text-purple-400 flex items-center gap-1">Lihat Detail <ExternalLink size={10}/></div>
                           </div>
                         ))}
-                    </div>
+                      </div>
+                      {usersList.filter(u => u.role === 'user').length === 0 && <div className="text-center text-slate-500 py-10 border border-slate-800 rounded-xl border-dashed">Belum ada UMKM terdaftar.</div>}
+                    </>
                  ) : (
                     <div className="animate-in slide-in-from-right">
                        <button onClick={() => setSelectedUmkm(null)} className="flex items-center gap-2 text-slate-400 hover:text-white mb-6 transition-colors"><ArrowLeft size={18}/> Kembali ke Daftar</button>
-                       <div className="flex items-center gap-4 mb-8"><div className="w-16 h-16 bg-purple-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold">{selectedUmkm.username.charAt(0).toUpperCase()}</div><div><h2 className="text-2xl font-bold text-white">{selectedUmkm.username}</h2><p className="text-slate-400 text-sm">Dashboard Monitoring Real-time</p></div></div>
-                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6"><Card className="border-l-4 border-l-cyan-500"><div className="text-xs text-slate-400 uppercase">Total Omzet</div><div className="text-xl font-bold text-white">{formatRupiah(transactions.filter(t => t.userName === selectedUmkm.username && t.type === 'income').reduce((a,c)=>a+c.amount,0))}</div></Card><Card className="border-l-4 border-l-green-500"><div className="text-xs text-slate-400 uppercase">Laba Bersih</div><div className="text-xl font-bold text-green-400">{formatRupiah(transactions.filter(t => t.userName === selectedUmkm.username && t.type === 'income').reduce((a,c)=>a+c.amount,0) - transactions.filter(t => t.userName === selectedUmkm.username && t.type === 'expense').reduce((a,c)=>a+c.amount,0))}</div></Card><Card className="border-l-4 border-l-purple-500"><div className="text-xs text-slate-400 uppercase">Tabungan</div><div className="text-xl font-bold text-white">{formatRupiah(savings.filter(s => s.userName === selectedUmkm.username).reduce((a,c)=>a+c.current,0))}</div></Card></div>
-                       <Card title={`Riwayat Transaksi: ${selectedUmkm.username}`}><div className="overflow-x-auto"><table className="w-full text-left text-sm text-slate-400"><thead className="bg-slate-950 text-slate-200 uppercase font-bold text-xs"><tr><th className="px-4 py-3">Tanggal</th><th className="px-4 py-3">Tipe</th><th className="px-4 py-3">Kategori</th><th className="px-4 py-3 text-right">Jumlah</th></tr></thead><tbody className="divide-y divide-slate-800">{transactions.filter(t => t.userName === selectedUmkm.username).map(t => (<tr key={t.id} className="hover:bg-slate-800/50"><td className="px-4 py-3">{formatDate(t.date)}</td><td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-[10px] uppercase ${t.type==='income'?'bg-green-500/10 text-green-400':'bg-red-500/10 text-red-400'}`}>{t.type==='income'?'Masuk':'Keluar'}</span></td><td className="px-4 py-3 text-white">{t.category}</td><td className={`px-4 py-3 text-right font-bold ${t.type==='income'?'text-green-400':'text-red-400'}`}>{formatRupiah(t.amount)}</td></tr>))}</tbody></table></div></Card>
+                       
+                       <div className="flex items-center gap-4 mb-8">
+                          <div className="w-16 h-16 bg-purple-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold">{(selectedUmkm.username || 'U').charAt(0).toUpperCase()}</div>
+                          <div>
+                             <h2 className="text-2xl font-bold text-white">{selectedUmkm.username}</h2>
+                             <p className="text-slate-400 text-sm">Dashboard Monitoring Real-time</p>
+                          </div>
+                       </div>
+
+                       {/* DASHBOARD MINI FOR SELECTED USER */}
+                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                          <Card className="border-l-4 border-l-cyan-500">
+                             <div className="text-xs text-slate-400 uppercase">Total Omzet</div>
+                             <div className="text-xl font-bold text-white">{formatRupiah(transactions.filter(t => t.userName === selectedUmkm.username && t.type === 'income').reduce((a,c)=>a+c.amount,0))}</div>
+                          </Card>
+                          <Card className="border-l-4 border-l-green-500">
+                             <div className="text-xs text-slate-400 uppercase">Laba Bersih</div>
+                             <div className="text-xl font-bold text-green-400">{formatRupiah(transactions.filter(t => t.userName === selectedUmkm.username && t.type === 'income').reduce((a,c)=>a+c.amount,0) - transactions.filter(t => t.userName === selectedUmkm.username && t.type === 'expense').reduce((a,c)=>a+c.amount,0))}</div>
+                          </Card>
+                          <Card className="border-l-4 border-l-purple-500">
+                             <div className="text-xs text-slate-400 uppercase">Tabungan</div>
+                             <div className="text-xl font-bold text-white">{formatRupiah(savings.filter(s => s.userName === selectedUmkm.username).reduce((a,c)=>a+c.current,0))}</div>
+                          </Card>
+                          <Card>
+                             <div className="text-xs text-slate-400 uppercase">Skor Kredit</div>
+                             <div className="text-2xl font-black text-blue-400">780</div>
+                          </Card>
+                       </div>
+
+                       <Card title={`Riwayat Transaksi: ${selectedUmkm.username}`}>
+                          <div className="overflow-x-auto">
+                             <table className="w-full text-left text-sm text-slate-400">
+                                <thead className="bg-slate-950 text-slate-200 uppercase font-bold text-xs"><tr><th className="px-4 py-3">Tanggal</th><th className="px-4 py-3">Tipe</th><th className="px-4 py-3">Kategori</th><th className="px-4 py-3 text-right">Jumlah</th></tr></thead>
+                                <tbody className="divide-y divide-slate-800">
+                                   {transactions.filter(t => t.userName === selectedUmkm.username).map(t => (
+                                      <tr key={t.id} className="hover:bg-slate-800/50">
+                                         <td className="px-4 py-3">{formatDate(t.date)}</td>
+                                         <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-[10px] uppercase ${t.type==='income'?'bg-green-500/10 text-green-400':'bg-red-500/10 text-red-400'}`}>{t.type==='income'?'Masuk':'Keluar'}</span></td>
+                                         <td className="px-4 py-3 text-white">{t.category}</td>
+                                         <td className={`px-4 py-3 text-right font-bold ${t.type==='income'?'text-green-400':'text-red-400'}`}>{formatRupiah(t.amount)}</td>
+                                      </tr>
+                                   ))}
+                                   {transactions.filter(t => t.userName === selectedUmkm.username).length === 0 && <tr><td colSpan="4" className="text-center py-8 italic">Belum ada transaksi.</td></tr>}
+                                </tbody>
+                             </table>
+                          </div>
+                       </Card>
                     </div>
                  )}
               </div>
@@ -763,17 +793,31 @@ const App = () => {
               <div className="space-y-6 animate-in fade-in">
                  <Card title="Konfigurasi Algoritma Skor Kredit">
                     <div className="p-4 bg-blue-900/10 border border-blue-500/20 rounded-lg mb-6 text-sm text-blue-300 flex gap-3 items-start">
-                       <ShieldAlert className="shrink-0 mt-0.5"/><div><p className="font-bold">Mode Simulasi</p><p>Pengubahan nilai di sini akan mempengaruhi perhitungan skor kredit user secara real-time pada update berikutnya.</p></div>
+                       <ShieldAlert className="shrink-0 mt-0.5"/>
+                       <div>
+                          <p className="font-bold">Mode Simulasi</p>
+                          <p>Pengubahan nilai di sini akan mempengaruhi perhitungan skor kredit user secara real-time pada update berikutnya.</p>
+                       </div>
                     </div>
                     <div className="space-y-6 max-w-xl">
                        <div><div className="flex justify-between mb-2"><label className="text-sm text-slate-400">Skor Dasar (Base Score)</label><span className="text-white font-bold">{scoreConfig.base}</span></div><input type="range" min="300" max="500" value={scoreConfig.base} onChange={e=>setScoreConfig({...scoreConfig, base: parseInt(e.target.value)})} className="w-full accent-purple-500 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer"/></div>
+                       <div><div className="flex justify-between mb-2"><label className="text-sm text-slate-400">Bobot Volume Transaksi</label><span className="text-white font-bold">{scoreConfig.trxWeight} Poin</span></div><input type="range" min="1" max="10" value={scoreConfig.trxWeight} onChange={e=>setScoreConfig({...scoreConfig, trxWeight: parseInt(e.target.value)})} className="w-full accent-cyan-500 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer"/></div>
+                       <div><div className="flex justify-between mb-2"><label className="text-sm text-slate-400">Bobot Konsistensi Tabungan</label><span className="text-white font-bold">{scoreConfig.savingWeight} Poin</span></div><input type="range" min="10" max="100" value={scoreConfig.savingWeight} onChange={e=>setScoreConfig({...scoreConfig, savingWeight: parseInt(e.target.value)})} className="w-full accent-green-500 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer"/></div>
                        <div className="pt-4 border-t border-slate-800 flex justify-end"><Button onClick={() => notify("Konfigurasi Skor Kredit Berhasil Disimpan!", "success")}>Simpan Perubahan</Button></div>
                     </div>
                  </Card>
               </div>
            )}
         </main>
-        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 flex justify-around p-3 z-50">{ADMIN_NAV_ITEMS.map(item => (<button key={item.id} onClick={() => setAdminTab(item.id)} className={`p-2 rounded-lg ${adminTab === item.id ? 'text-purple-400' : 'text-slate-500'}`}><item.icon className="w-6 h-6" /></button>))}</div>
+        
+        {/* Mobile Nav Admin */}
+        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 flex justify-around p-3 z-50">
+           {ADMIN_NAV_ITEMS.map(item => (
+             <button key={item.id} onClick={() => setAdminTab(item.id)} className={`p-2 rounded-lg ${adminTab === item.id ? 'text-purple-400' : 'text-slate-500'}`}>
+               <item.icon className="w-6 h-6" />
+             </button>
+           ))}
+        </div>
       </div>
     );
   }
@@ -787,7 +831,13 @@ const App = () => {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans flex">
       <ToastContainer toasts={toasts} removeToast={removeToast} />
-      {showQrisGenerate && <QrisGenerateModal amount={currentTxData?.amount} onClose={() => { setShowQrisGenerate(false); setPaymentMethod('cash'); setPaymentProvider(''); setTransactionType('income'); setCurrentTxData(null); }} />}
+      {showQrisGenerate && <QrisGenerateModal amount={currentTxData?.amount} onClose={() => {
+          setShowQrisGenerate(false);
+          setPaymentMethod('cash'); 
+          setPaymentProvider(''); 
+          setTransactionType('income'); 
+          setCurrentTxData(null);
+      }} />}
       {showQrisScanner && <QrisScannerModal onScanComplete={handleScanSuccess} onClose={() => setShowQrisScanner(false)} />}
       {showTransferProcessing && <TransferProcessingModal onClose={() => finalizeTransfer(currentTxData)} />}
       {selectedInvestment && <InvestmentModal product={selectedInvestment} onClose={() => setSelectedInvestment(null)} onConfirm={handleBuyInvestment} />}
@@ -822,6 +872,7 @@ const App = () => {
                          <label className="cursor-pointer"><input type="radio" name="type" value="expense" checked={transactionType === 'expense'} onChange={() => setTransactionType('expense')} className="peer hidden" /><div className={`p-4 rounded-xl border border-slate-700 text-center text-slate-500 font-bold transition-all ${transactionType === 'expense' ? 'bg-red-500/10 border-red-500 text-red-400' : ''}`}>Pengeluaran</div></label>
                       </div>
 
+                      {/* CONDITIONAL INPUT: Sembunyikan jika Expense + QRIS */}
                       {!(transactionType === 'expense' && paymentMethod === 'qris') && (
                         <div className="animate-in fade-in slide-in-from-top">
                            <Input name="amount" label="Nominal" type="number" placeholder="0" required />
