@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db } from './fire'; 
+import { db } from './fire'; // Pastikan file fire.js ada dan export db benar
 import { 
   collection, 
   addDoc, 
@@ -13,14 +13,15 @@ import {
   getDocs
 } from 'firebase/firestore';
 
+// Menggunakan icon standar yang pasti ada untuk mencegah crash
 import { 
   LayoutDashboard, Wallet, PiggyBank, BookOpen, LogOut, 
   Plus, CreditCard, PlayCircle, CheckCircle, XCircle, 
   AlertCircle, Trash2, Eye, EyeOff, ExternalLink, ShieldAlert,
   QrCode, Smartphone, Banknote, Landmark, Camera, ScanLine, 
-  TrendingUp, Coins, Loader2, Store, ShoppingBag, Briefcase,
-  Settings, Users, Activity, FileText, CheckSquare, ArrowLeft, User, BarChart,
-  ArrowDownCircle, ArrowUpCircle, Download, AlertTriangle
+  TrendingUp, Coins, Loader2, AlertTriangle,
+  Settings, Users, CheckSquare, ArrowLeft, User, Download,
+  ArrowDown, ArrowUp // Ganti ArrowCircle ke Arrow biasa (lebih aman)
 } from 'lucide-react';
 
 /**
@@ -151,8 +152,21 @@ const PasswordInput = ({ label, value, onChange, placeholder, name }) => {
     <div className="mb-4">
       {label && <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">{label}</label>}
       <div className="relative">
-        <input name={name} type={show ? "text" : "password"} value={value} onChange={onChange} placeholder={placeholder} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors placeholder:text-slate-600 pr-10" />
-        <button type="button" onClick={() => setShow(!show)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-cyan-400 transition-colors">{show ? <EyeOff size={18} /> : <Eye size={18} />}</button>
+        <input 
+          name={name}
+          type={show ? "text" : "password"} 
+          value={value} 
+          onChange={onChange} 
+          placeholder={placeholder} 
+          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors placeholder:text-slate-600 pr-10" 
+        />
+        <button 
+          type="button"
+          onClick={() => setShow(!show)}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-cyan-400 transition-colors"
+        >
+          {show ? <EyeOff size={18} /> : <Eye size={18} />}
+        </button>
       </div>
     </div>
   );
@@ -247,7 +261,10 @@ const QrisScannerModal = ({ onScanComplete, onClose }) => {
         {isCameraActive ? <video ref={videoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover opacity-80"></video> : <div className="absolute inset-0 bg-gradient-to-b from-gray-800 to-gray-900 flex items-center justify-center"><p className="text-gray-500 text-sm">Simulasi Kamera...</p></div>}
         <div className="relative w-64 h-64 border-2 border-cyan-400/50 rounded-3xl z-10 overflow-hidden shadow-[0_0_100px_rgba(34,211,238,0.2)]">
            <div className="absolute top-0 left-0 w-full h-1 bg-cyan-400 shadow-[0_0_20px_rgba(34,211,238,1)] animate-[scan_2s_infinite_linear]"></div>
-           {/* Decoration */}
+           <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-cyan-400 rounded-tl-xl"></div>
+           <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-cyan-400 rounded-tr-xl"></div>
+           <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-cyan-400 rounded-bl-xl"></div>
+           <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-cyan-400 rounded-br-xl"></div>
         </div>
         <div className="absolute bottom-32 text-center w-full z-10">
            {scanStatus === 'searching' ? <div className="inline-flex items-center gap-2 bg-black/60 px-4 py-2 rounded-full text-cyan-400 text-sm font-medium animate-pulse"><ScanLine size={16}/> Mencari kode LPay...</div> : <div className="inline-flex items-center gap-2 bg-green-500 px-6 py-2 rounded-full text-white text-base font-bold animate-in zoom-in"><CheckCircle size={20}/> LPay Ditemukan!</div>}
@@ -402,34 +419,35 @@ const App = () => {
   useEffect(() => {
     if (!user || isDemoMode) return;
 
-    let unsubUsers = () => {};
-    if (user.role === 'admin') {
-      unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
-        setUsersList(snap.docs.map(d => ({...d.data(), id: d.id})));
-      }, (err) => console.log("Err fetch users:", err));
-    }
-
-    let unsubTrx, unsubSav, unsubLoans, unsubInvest;
-
+    // SAFETY WRAPPER FOR LISTENERS
     try {
-      const qTrx = query(collection(db, "transactions"), orderBy("createdAt", "desc"));
-      unsubTrx = onSnapshot(qTrx, (snap) => { if (snap && snap.docs) setTransactions(snap.docs.map(d => ({ ...d.data(), id: d.id }))); }, (err) => console.log("Trx Error:", err));
-      
-      unsubSav = onSnapshot(collection(db, "savings"), (snap) => setSavings(snap.docs.map(d => ({ ...d.data(), id: d.id }))));
-      unsubLoans = onSnapshot(collection(db, "loans"), (snap) => setLoans(snap.docs.map(d => ({ ...d.data(), id: d.id }))));
-      unsubInvest = onSnapshot(collection(db, "my_investments"), (snap) => setMyInvestments(snap.docs.map(d => ({ ...d.data(), id: d.id }))));
+        // Fetch Users (Admin Only)
+        let unsubUsers = () => {};
+        if (user.role === 'admin') {
+          unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
+            setUsersList(snap.docs.map(d => ({...d.data(), id: d.id})));
+          }, (err) => console.log("User Listener Error:", err));
+        }
 
+        // Main Listeners
+        const qTrx = query(collection(db, "transactions"), orderBy("createdAt", "desc"));
+        const unsubTrx = onSnapshot(qTrx, (snap) => { if (snap && snap.docs) setTransactions(snap.docs.map(d => ({ ...d.data(), id: d.id }))); }, (err) => console.log("Trx Listener Error:", err));
+        
+        const unsubSav = onSnapshot(collection(db, "savings"), (snap) => setSavings(snap.docs.map(d => ({ ...d.data(), id: d.id }))));
+        const unsubLoans = onSnapshot(collection(db, "loans"), (snap) => setLoans(snap.docs.map(d => ({ ...d.data(), id: d.id }))));
+        const unsubInvest = onSnapshot(collection(db, "my_investments"), (snap) => setMyInvestments(snap.docs.map(d => ({ ...d.data(), id: d.id }))));
+
+        // Cleanup
+        return () => { 
+          unsubUsers();
+          unsubTrx(); 
+          unsubSav(); 
+          unsubLoans(); 
+          unsubInvest(); 
+        };
     } catch (e) {
-      console.log("Listener failed:", e);
+        console.error("Listener Init Failed:", e);
     }
-    
-    return () => { 
-      if(unsubUsers) unsubUsers();
-      if(unsubTrx) unsubTrx(); 
-      if(unsubSav) unsubSav(); 
-      if(unsubLoans) unsubLoans(); 
-      if(unsubInvest) unsubInvest(); 
-    };
   }, [user, isDemoMode]);
 
   // --- AUTH ACTIONS ---
@@ -535,7 +553,6 @@ const App = () => {
   const handleWithdrawInvestment = async (inv) => {
     if(!window.confirm(`Cairkan ${inv.name} sekarang?`)) return;
     
-    // RISK LOGIC
     let actualReturnRate = inv.returnRate; 
     const luckFactor = Math.random(); 
     let noteText = "";
@@ -584,14 +601,17 @@ const App = () => {
   const handleLoanAction = async (id, status) => { if (isDemoMode) { setLoans(prev=>prev.map(l=>l.id===id?{...l,status}:l)); } else { await updateDoc(doc(db, "loans", id), { status }); } notify(`Status: ${status}`, 'success'); };
 
   // --- USER SCORE CALCULATION ---
-  const totalIncome = transactions.filter(t => t.type === 'income').reduce((acc, curr) => acc + curr.amount, 0);
-  const totalExpense = transactions.filter(t => t.type === 'expense').reduce((acc, curr) => acc + curr.amount, 0);
-  const profit = totalIncome - totalExpense;
+  // Variable totalIncome dll sudah dihapus di sini, pakai yg di bawah saja.
   
   const calculateScore = () => {
+    // Re-calculate inside function to avoid duplicate declaration error scope
+    const tInc = transactions.filter(t => t.type === 'income').reduce((acc, curr) => acc + curr.amount, 0);
+    const tExp = transactions.filter(t => t.type === 'expense').reduce((acc, curr) => acc + curr.amount, 0);
+    const prof = tInc - tExp;
+
     let score = scoreConfig.base;
-    score += Math.min(Math.floor(totalIncome / 100000) * scoreConfig.trxWeight, 200);
-    if (profit > 0) score += 100;
+    score += Math.min(Math.floor(tInc / 100000) * scoreConfig.trxWeight, 200);
+    if (prof > 0) score += 100;
     score += Math.min(savings.length * scoreConfig.savingWeight, 150);
     return Math.min(score, 850);
   };
@@ -609,7 +629,6 @@ const App = () => {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden font-sans">
         <ToastContainer toasts={toasts} removeToast={removeToast} />
-        {/* Background Gradients & Animation */}
         <div className="absolute inset-0 overflow-hidden"><div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-600/20 rounded-full blur-[120px]"/><div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-cyan-600/10 rounded-full blur-[120px]"/></div>
         
         <div className="w-full max-w-md z-10 animate-in zoom-in duration-500">
@@ -653,13 +672,11 @@ const App = () => {
     );
   }
 
-  // --- ADMIN VIEW (NEW REVISED LAYOUT) ---
+  // --- ADMIN VIEW ---
   if (user.role === 'admin') {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-200 font-sans flex">
         <ToastContainer toasts={toasts} removeToast={removeToast} />
-        
-        {/* Admin Sidebar */}
         <aside className="w-20 lg:w-64 bg-slate-900 border-r border-slate-800 fixed h-full z-20 hidden md:flex flex-col">
           <div className="p-6 flex justify-center lg:justify-start h-20 items-center"><div className="lg:hidden"><Logo size="text-xl"/></div><div className="hidden lg:block"><Logo/></div></div>
           <div className="px-6 mb-2"><span className="bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded text-[10px] font-bold border border-purple-500/50 uppercase tracking-wider">Admin Portal</span></div>
@@ -673,156 +690,59 @@ const App = () => {
           <div className="p-4 border-t border-slate-800"><button onClick={() => setUser(null)} className="w-full flex items-center justify-center lg:justify-start gap-3 text-slate-500 hover:text-red-400 p-2 rounded-lg hover:bg-red-500/10"><LogOut size={20} /><span className="hidden lg:inline font-medium">Keluar</span></button></div>
         </aside>
         
-        {/* Admin Content */}
         <main className="flex-1 md:ml-20 lg:ml-64 p-4 lg:p-8 max-w-7xl mx-auto w-full mb-20 md:mb-0">
            <header className="mb-8 hidden md:block"><h1 className="text-3xl font-bold text-white mb-1 capitalize">{ADMIN_NAV_ITEMS.find(i=>i.id===adminTab)?.label}</h1><p className="text-slate-400 text-sm">Admin Control Panel</p></header>
-           
-           {/* TAB: APPROVAL */}
            {adminTab === 'admin_approval' && (
              <div className="space-y-6 animate-in fade-in">
                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Card className="bg-slate-800 border-l-4 border-l-yellow-500">
-                     <h3 className="text-slate-400 text-xs font-bold uppercase">Menunggu Persetujuan</h3>
-                     <p className="text-3xl font-bold text-yellow-400 mt-2">{loans.filter(l => l.status === 'Pending').length}</p>
-                  </Card>
-                  <Card className="bg-slate-800 border-l-4 border-l-green-500">
-                     <h3 className="text-slate-400 text-xs font-bold uppercase">Total Disetujui</h3>
-                     <p className="text-3xl font-bold text-green-400 mt-2">{loans.filter(l => l.status === 'Approved').length}</p>
-                  </Card>
+                  <Card className="bg-slate-800 border-l-4 border-l-yellow-500"><h3 className="text-slate-400 text-xs font-bold uppercase">Menunggu Persetujuan</h3><p className="text-3xl font-bold text-yellow-400 mt-2">{loans.filter(l => l.status === 'Pending').length}</p></Card>
+                  <Card className="bg-slate-800 border-l-4 border-l-green-500"><h3 className="text-slate-400 text-xs font-bold uppercase">Total Disetujui</h3><p className="text-3xl font-bold text-green-400 mt-2">{loans.filter(l => l.status === 'Approved').length}</p></Card>
                </div>
-               <Card title="Antrian Pengajuan Pinjaman">
-                  <div className="overflow-x-auto mt-4">
-                    <table className="w-full text-left text-sm text-slate-400">
-                      <thead className="bg-slate-950 text-slate-200 uppercase font-bold text-xs"><tr><th className="px-4 py-3">User</th><th className="px-4 py-3">Jumlah</th><th className="px-4 py-3">Skor</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Aksi</th></tr></thead>
-                      <tbody className="divide-y divide-slate-800">
-                        {loans.map(loan => (
-                          <tr key={loan.id} className="hover:bg-slate-800/50">
-                            <td className="px-4 py-4 text-white font-medium">{loan.userName}<div className="text-xs text-slate-500">{loan.date}</div></td>
-                            <td className="px-4 py-4">{formatRupiah(loan.amount)}</td>
-                            <td className="px-4 py-4"><span className="bg-blue-500/10 text-blue-400 px-2 py-1 rounded font-bold">{loan.userScore}</span></td>
-                            <td className="px-4 py-4"><span className={`px-2 py-1 rounded text-xs font-bold uppercase ${loan.status === 'Approved' ? 'bg-green-500/20 text-green-400' : loan.status === 'Rejected' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{loan.status}</span></td>
-                            <td className="px-4 py-4 flex justify-end gap-2">
-                              {loan.status === 'Pending' && <><button onClick={() => handleLoanAction(loan.id, 'Approved')} className="bg-green-600 p-1.5 rounded-md text-white hover:bg-green-500"><CheckCircle size={16}/></button><button onClick={() => handleLoanAction(loan.id, 'Rejected')} className="bg-red-600 p-1.5 rounded-md text-white hover:bg-red-500"><XCircle size={16}/></button></>}
-                            </td>
-                          </tr>
-                        ))}
-                        {loans.length === 0 && <tr><td colSpan="5" className="text-center py-8 italic">Tidak ada pengajuan baru.</td></tr>}
-                      </tbody>
-                    </table>
-                  </div>
-               </Card>
+               <Card title="Antrian Pengajuan Pinjaman"><div className="overflow-x-auto mt-4"><table className="w-full text-left text-sm text-slate-400"><thead className="bg-slate-950 text-slate-200 uppercase font-bold text-xs"><tr><th className="px-4 py-3">User</th><th className="px-4 py-3">Jumlah</th><th className="px-4 py-3">Skor</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Aksi</th></tr></thead><tbody className="divide-y divide-slate-800">{loans.map(loan => (<tr key={loan.id} className="hover:bg-slate-800/50"><td className="px-4 py-4 text-white font-medium">{loan.userName}<div className="text-xs text-slate-500">{loan.date}</div></td><td className="px-4 py-4">{formatRupiah(loan.amount)}</td><td className="px-4 py-4"><span className="bg-blue-500/10 text-blue-400 px-2 py-1 rounded font-bold">{loan.userScore}</span></td><td className="px-4 py-4"><span className={`px-2 py-1 rounded text-xs font-bold uppercase ${loan.status === 'Approved' ? 'bg-green-500/20 text-green-400' : loan.status === 'Rejected' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{loan.status}</span></td><td className="px-4 py-4 flex justify-end gap-2">{loan.status === 'Pending' && <><button onClick={() => handleLoanAction(loan.id, 'Approved')} className="bg-green-600 p-1.5 rounded-md text-white hover:bg-green-500"><CheckCircle size={16}/></button><button onClick={() => handleLoanAction(loan.id, 'Rejected')} className="bg-red-600 p-1.5 rounded-md text-white hover:bg-red-500"><XCircle size={16}/></button></>}</td></tr>))}</tbody></table></div></Card>
              </div>
            )}
-
-           {/* TAB: MONITORING UMKM (UPDATED) */}
            {adminTab === 'admin_monitoring' && (
               <div className="space-y-6 animate-in fade-in">
                  {!selectedUmkm ? (
-                    <>
-                      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
                         {usersList.filter(u => u.role === 'user').map(u => (
                           <div key={u.id} onClick={() => setSelectedUmkm(u)} className="bg-slate-900 border border-slate-800 p-6 rounded-xl hover:border-purple-500/50 cursor-pointer transition-all group">
-                             <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center mb-4 group-hover:bg-purple-500/20 group-hover:text-purple-400 transition-colors">
-                                <User size={24} className="text-slate-400 group-hover:text-purple-400"/>
-                             </div>
-                             <h3 className="text-white font-bold text-lg truncate">{u.username}</h3>
-                             <p className="text-xs text-slate-500 mt-1">UMKM Terdaftar</p>
+                             <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center mb-4 group-hover:bg-purple-500/20 group-hover:text-purple-400 transition-colors"><User size={24} className="text-slate-400 group-hover:text-purple-400"/></div>
+                             <h3 className="text-white font-bold text-lg truncate">{u.username}</h3><p className="text-xs text-slate-500 mt-1">UMKM Terdaftar</p>
                              <div className="mt-4 text-xs text-purple-400 flex items-center gap-1">Lihat Detail <ExternalLink size={10}/></div>
                           </div>
                         ))}
-                      </div>
-                      {usersList.filter(u => u.role === 'user').length === 0 && <div className="text-center text-slate-500 py-10 border border-slate-800 rounded-xl border-dashed">Belum ada UMKM terdaftar.</div>}
-                    </>
+                    </div>
                  ) : (
                     <div className="animate-in slide-in-from-right">
                        <button onClick={() => setSelectedUmkm(null)} className="flex items-center gap-2 text-slate-400 hover:text-white mb-6 transition-colors"><ArrowLeft size={18}/> Kembali ke Daftar</button>
-                       
-                       <div className="flex items-center gap-4 mb-8">
-                          <div className="w-16 h-16 bg-purple-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold">{(selectedUmkm.username || 'U').charAt(0).toUpperCase()}</div>
-                          <div>
-                             <h2 className="text-2xl font-bold text-white">{selectedUmkm.username}</h2>
-                             <p className="text-slate-400 text-sm">Dashboard Monitoring Real-time</p>
-                          </div>
-                       </div>
-
-                       {/* DASHBOARD MINI FOR SELECTED USER */}
-                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                          <Card className="border-l-4 border-l-cyan-500">
-                             <div className="text-xs text-slate-400 uppercase">Total Omzet</div>
-                             <div className="text-xl font-bold text-white">{formatRupiah(transactions.filter(t => t.userName === selectedUmkm.username && t.type === 'income').reduce((a,c)=>a+c.amount,0))}</div>
-                          </Card>
-                          <Card className="border-l-4 border-l-green-500">
-                             <div className="text-xs text-slate-400 uppercase">Laba Bersih</div>
-                             <div className="text-xl font-bold text-green-400">{formatRupiah(transactions.filter(t => t.userName === selectedUmkm.username && t.type === 'income').reduce((a,c)=>a+c.amount,0) - transactions.filter(t => t.userName === selectedUmkm.username && t.type === 'expense').reduce((a,c)=>a+c.amount,0))}</div>
-                          </Card>
-                          <Card className="border-l-4 border-l-purple-500">
-                             <div className="text-xs text-slate-400 uppercase">Tabungan</div>
-                             <div className="text-xl font-bold text-white">{formatRupiah(savings.filter(s => s.userName === selectedUmkm.username).reduce((a,c)=>a+c.current,0))}</div>
-                          </Card>
-                          <Card>
-                             <div className="text-xs text-slate-400 uppercase">Skor Kredit</div>
-                             <div className="text-2xl font-black text-blue-400">780</div>
-                          </Card>
-                       </div>
-
-                       <Card title={`Riwayat Transaksi: ${selectedUmkm.username}`}>
-                          <div className="overflow-x-auto">
-                             <table className="w-full text-left text-sm text-slate-400">
-                                <thead className="bg-slate-950 text-slate-200 uppercase font-bold text-xs"><tr><th className="px-4 py-3">Tanggal</th><th className="px-4 py-3">Tipe</th><th className="px-4 py-3">Kategori</th><th className="px-4 py-3 text-right">Jumlah</th></tr></thead>
-                                <tbody className="divide-y divide-slate-800">
-                                   {transactions.filter(t => t.userName === selectedUmkm.username).map(t => (
-                                      <tr key={t.id} className="hover:bg-slate-800/50">
-                                         <td className="px-4 py-3">{formatDate(t.date)}</td>
-                                         <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-[10px] uppercase ${t.type==='income'?'bg-green-500/10 text-green-400':'bg-red-500/10 text-red-400'}`}>{t.type==='income'?'Masuk':'Keluar'}</span></td>
-                                         <td className="px-4 py-3 text-white">{t.category}</td>
-                                         <td className={`px-4 py-3 text-right font-bold ${t.type==='income'?'text-green-400':'text-red-400'}`}>{formatRupiah(t.amount)}</td>
-                                      </tr>
-                                   ))}
-                                   {transactions.filter(t => t.userName === selectedUmkm.username).length === 0 && <tr><td colSpan="4" className="text-center py-8 italic">Belum ada transaksi.</td></tr>}
-                                </tbody>
-                             </table>
-                          </div>
-                       </Card>
+                       <div className="flex items-center gap-4 mb-8"><div className="w-16 h-16 bg-purple-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold">{(selectedUmkm.username || 'U').charAt(0).toUpperCase()}</div><div><h2 className="text-2xl font-bold text-white">{selectedUmkm.username}</h2><p className="text-slate-400 text-sm">Dashboard Monitoring Real-time</p></div></div>
+                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6"><Card className="border-l-4 border-l-cyan-500" title="Total Omzet"><div className="text-xl font-bold text-white">{formatRupiah(transactions.filter(t => t.userName === selectedUmkm.username && t.type === 'income').reduce((a,c)=>a+c.amount,0))}</div></Card><Card className="border-l-4 border-l-green-500" title="Laba Bersih"><div className="text-xl font-bold text-green-400">{formatRupiah(transactions.filter(t => t.userName === selectedUmkm.username && t.type === 'income').reduce((a,c)=>a+c.amount,0) - transactions.filter(t => t.userName === selectedUmkm.username && t.type === 'expense').reduce((a,c)=>a+c.amount,0))}</div></Card><Card className="border-l-4 border-l-purple-500" title="Tabungan"><div className="text-xl font-bold text-white">{formatRupiah(savings.filter(s => s.userName === selectedUmkm.username).reduce((a,c)=>a+c.current,0))}</div></Card></div>
+                       <Card title={`Riwayat Transaksi: ${selectedUmkm.username}`}><div className="overflow-x-auto"><table className="w-full text-left text-sm text-slate-400"><thead className="bg-slate-950 text-slate-200 uppercase font-bold text-xs"><tr><th className="px-4 py-3">Tanggal</th><th className="px-4 py-3">Tipe</th><th className="px-4 py-3">Kategori</th><th className="px-4 py-3 text-right">Jumlah</th></tr></thead><tbody className="divide-y divide-slate-800">{transactions.filter(t => t.userName === selectedUmkm.username).map(t => (<tr key={t.id} className="hover:bg-slate-800/50"><td className="px-4 py-3">{formatDate(t.date)}</td><td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-[10px] uppercase ${t.type==='income'?'bg-green-500/10 text-green-400':'bg-red-500/10 text-red-400'}`}>{t.type==='income'?'Masuk':'Keluar'}</span></td><td className="px-4 py-3 text-white">{t.category}</td><td className={`px-4 py-3 text-right font-bold ${t.type==='income'?'text-green-400':'text-red-400'}`}>{formatRupiah(t.amount)}</td></tr>))}</tbody></table></div></Card>
                     </div>
                  )}
               </div>
            )}
-
-           {/* TAB: SETTINGS */}
            {adminTab === 'admin_settings' && (
               <div className="space-y-6 animate-in fade-in">
                  <Card title="Konfigurasi Algoritma Skor Kredit">
-                    <div className="p-4 bg-blue-900/10 border border-blue-500/20 rounded-lg mb-6 text-sm text-blue-300 flex gap-3 items-start">
-                       <ShieldAlert className="shrink-0 mt-0.5"/>
-                       <div>
-                          <p className="font-bold">Mode Simulasi</p>
-                          <p>Pengubahan nilai di sini akan mempengaruhi perhitungan skor kredit user secara real-time pada update berikutnya.</p>
-                       </div>
-                    </div>
-                    <div className="space-y-6 max-w-xl">
-                       <div><div className="flex justify-between mb-2"><label className="text-sm text-slate-400">Skor Dasar (Base Score)</label><span className="text-white font-bold">{scoreConfig.base}</span></div><input type="range" min="300" max="500" value={scoreConfig.base} onChange={e=>setScoreConfig({...scoreConfig, base: parseInt(e.target.value)})} className="w-full accent-purple-500 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer"/></div>
-                       <div><div className="flex justify-between mb-2"><label className="text-sm text-slate-400">Bobot Volume Transaksi</label><span className="text-white font-bold">{scoreConfig.trxWeight} Poin</span></div><input type="range" min="1" max="10" value={scoreConfig.trxWeight} onChange={e=>setScoreConfig({...scoreConfig, trxWeight: parseInt(e.target.value)})} className="w-full accent-cyan-500 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer"/></div>
-                       <div><div className="flex justify-between mb-2"><label className="text-sm text-slate-400">Bobot Konsistensi Tabungan</label><span className="text-white font-bold">{scoreConfig.savingWeight} Poin</span></div><input type="range" min="10" max="100" value={scoreConfig.savingWeight} onChange={e=>setScoreConfig({...scoreConfig, savingWeight: parseInt(e.target.value)})} className="w-full accent-green-500 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer"/></div>
-                       <div className="pt-4 border-t border-slate-800 flex justify-end"><Button onClick={() => notify("Konfigurasi Skor Kredit Berhasil Disimpan!", "success")}>Simpan Perubahan</Button></div>
-                    </div>
+                    <div className="p-4 bg-blue-900/10 border border-blue-500/20 rounded-lg mb-6 text-sm text-blue-300 flex gap-3 items-start"><ShieldAlert className="shrink-0 mt-0.5"/><div><p className="font-bold">Mode Simulasi</p><p>Pengubahan nilai di sini akan mempengaruhi perhitungan skor kredit user secara real-time pada update berikutnya.</p></div></div>
+                    <div className="space-y-6 max-w-xl"><div><div className="flex justify-between mb-2"><label className="text-sm text-slate-400">Skor Dasar (Base Score)</label><span className="text-white font-bold">{scoreConfig.base}</span></div><input type="range" min="300" max="500" value={scoreConfig.base} onChange={e=>setScoreConfig({...scoreConfig, base: parseInt(e.target.value)})} className="w-full accent-purple-500 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer"/></div><div className="pt-4 border-t border-slate-800 flex justify-end"><Button onClick={() => notify("Konfigurasi Skor Kredit Berhasil Disimpan!", "success")}>Simpan Perubahan</Button></div></div>
                  </Card>
               </div>
            )}
         </main>
-        
-        {/* Mobile Nav Admin */}
-        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 flex justify-around p-3 z-50">
-           {ADMIN_NAV_ITEMS.map(item => (
-             <button key={item.id} onClick={() => setAdminTab(item.id)} className={`p-2 rounded-lg ${adminTab === item.id ? 'text-purple-400' : 'text-slate-500'}`}>
-               <item.icon className="w-6 h-6" />
-             </button>
-           ))}
-        </div>
+        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 flex justify-around p-3 z-50">{ADMIN_NAV_ITEMS.map(item => (<button key={item.id} onClick={() => setAdminTab(item.id)} className={`p-2 rounded-lg ${adminTab === item.id ? 'text-purple-400' : 'text-slate-500'}`}><item.icon className="w-6 h-6" /></button>))}</div>
       </div>
     );
   }
 
   // --- USER VIEW ---
+  const totalIncome = transactions.filter(t => t.type === 'income').reduce((acc, curr) => acc + curr.amount, 0);
+  const totalExpense = transactions.filter(t => t.type === 'expense').reduce((acc, curr) => acc + curr.amount, 0);
+  const profit = totalIncome - totalExpense;
+  const totalSavings = savings.reduce((acc, curr) => acc + curr.current, 0);
+  
   const chartData = Object.entries(transactions.reduce((acc, t) => {
     if (t.type === 'income') acc[t.date] = (acc[t.date] || 0) + t.amount;
     return acc;
@@ -831,13 +751,7 @@ const App = () => {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans flex">
       <ToastContainer toasts={toasts} removeToast={removeToast} />
-      {showQrisGenerate && <QrisGenerateModal amount={currentTxData?.amount} onClose={() => {
-          setShowQrisGenerate(false);
-          setPaymentMethod('cash'); 
-          setPaymentProvider(''); 
-          setTransactionType('income'); 
-          setCurrentTxData(null);
-      }} />}
+      {showQrisGenerate && <QrisGenerateModal amount={currentTxData?.amount} onClose={() => { setShowQrisGenerate(false); setPaymentMethod('cash'); setPaymentProvider(''); setTransactionType('income'); setCurrentTxData(null); }} />}
       {showQrisScanner && <QrisScannerModal onScanComplete={handleScanSuccess} onClose={() => setShowQrisScanner(false)} />}
       {showTransferProcessing && <TransferProcessingModal onClose={() => finalizeTransfer(currentTxData)} />}
       {selectedInvestment && <InvestmentModal product={selectedInvestment} onClose={() => setSelectedInvestment(null)} onConfirm={handleBuyInvestment} />}
@@ -860,7 +774,7 @@ const App = () => {
       <main className="flex-1 md:ml-20 lg:ml-64 p-4 lg:p-8 max-w-7xl mx-auto w-full mb-20 md:mb-0">
         <header className="mb-8 hidden md:block"><h1 className="text-3xl font-bold text-white mb-1 capitalize">{activePage === 'pos' ? 'Sistem Kasir & Pembayaran' : activePage}</h1><p className="text-slate-400 text-sm">LifeFin v1.29.25.12 {isDemoMode ? '(OFFLINE DEMO)' : '(Connected)'}</p></header>
         
-        {activePage === 'dashboard' && <div className="space-y-6 animate-in fade-in"><div className="grid grid-cols-1 md:grid-cols-4 gap-4"><Card className="border-l-4 border-l-cyan-500" decorationIcon={ShoppingBag} title="Total Omzet"><div className="text-2xl font-bold text-white">{formatRupiah(totalIncome)}</div></Card><Card className="border-l-4 border-l-green-500" decorationIcon={ArrowDownCircle} title="Total Pengeluaran"><div className="text-2xl font-bold text-red-400">{formatRupiah(totalExpense)}</div></Card><Card className="border-l-4 border-l-blue-500" decorationIcon={Wallet} title="Sisa Saldo"><div className="text-2xl font-bold text-blue-400">{formatRupiah(profit)}</div></Card><Card decorationIcon={Activity} title="Skor Kredit"><div className={`text-3xl font-black ${getScoreColor(userCreditScore)}`}>{userCreditScore}</div></Card></div><div className="grid grid-cols-1 lg:grid-cols-3 gap-6"><Card title="Tren Omzet" className="lg:col-span-2"><div className="mt-4"><SimpleChart data={chartData} /></div></Card><Card title="Aktivitas Terbaru"><div className="space-y-3 max-h-[250px] overflow-y-auto pr-2">{transactions.slice(0,5).map(t=><div key={t.id} className="flex justify-between items-center p-3 bg-slate-950 rounded border border-slate-800"><div><div className="font-bold text-white">{t.category}</div><div className="text-xs text-slate-500 flex gap-2 items-center"><span>{(t.paymentMethod || 'cash').toUpperCase()} {(t.paymentProvider && t.paymentProvider !== '-') ? `(${t.paymentProvider})` : ''}</span>{t.transferStatus && t.transferStatus !== '-' && <span className={`px-1.5 py-0.5 rounded text-[10px] ${t.transferStatus==='Berhasil'?'bg-green-500/20 text-green-400':'bg-yellow-500/20 text-yellow-400'}`}>{t.transferStatus}</span>}</div></div><div className={t.type==='income'?'text-green-400':'text-red-400'}>{formatRupiah(t.amount)}</div></div>)}</div></Card></div></div>}
+        {activePage === 'dashboard' && <div className="space-y-6 animate-in fade-in"><div className="grid grid-cols-1 md:grid-cols-4 gap-4"><Card className="border-l-4 border-l-cyan-500" decorationIcon={Wallet} title="Total Omzet"><div className="text-2xl font-bold text-white">{formatRupiah(totalIncome)}</div></Card><Card className="border-l-4 border-l-green-500" decorationIcon={ArrowDown} title="Total Pengeluaran"><div className="text-2xl font-bold text-red-400">{formatRupiah(totalExpense)}</div></Card><Card className="border-l-4 border-l-blue-500" decorationIcon={Wallet} title="Sisa Saldo"><div className="text-2xl font-bold text-blue-400">{formatRupiah(profit)}</div></Card><Card decorationIcon={Activity} title="Skor Kredit"><div className={`text-3xl font-black ${getScoreColor(userCreditScore)}`}>{userCreditScore}</div></Card></div><div className="grid grid-cols-1 lg:grid-cols-3 gap-6"><Card title="Tren Omzet" className="lg:col-span-2"><div className="mt-4"><SimpleChart data={chartData} /></div></Card><Card title="Aktivitas Terbaru"><div className="space-y-3 max-h-[250px] overflow-y-auto pr-2">{transactions.slice(0,5).map(t=><div key={t.id} className="flex justify-between items-center p-3 bg-slate-950 rounded border border-slate-800"><div><div className="font-bold text-white">{t.category}</div><div className="text-xs text-slate-500 flex gap-2 items-center"><span>{(t.paymentMethod || 'cash').toUpperCase()} {(t.paymentProvider && t.paymentProvider !== '-') ? `(${t.paymentProvider})` : ''}</span>{t.transferStatus && t.transferStatus !== '-' && <span className={`px-1.5 py-0.5 rounded text-[10px] ${t.transferStatus==='Berhasil'?'bg-green-500/20 text-green-400':'bg-yellow-500/20 text-yellow-400'}`}>{t.transferStatus}</span>}</div></div><div className={t.type==='income'?'text-green-400':'text-red-400'}>{formatRupiah(t.amount)}</div></div>)}</div></Card></div></div>}
         
         {activePage === 'pos' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in slide-in-from-right">
