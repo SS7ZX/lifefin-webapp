@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db } from './fire'; // Pastikan file fire.js ada dan export db benar
+import { db } from './fire'; 
 import { 
   collection, 
   addDoc, 
@@ -13,7 +13,6 @@ import {
   getDocs
 } from 'firebase/firestore';
 
-// Menggunakan icon standar yang pasti ada untuk mencegah crash
 import { 
   LayoutDashboard, Wallet, PiggyBank, BookOpen, LogOut, 
   Plus, CreditCard, PlayCircle, CheckCircle, XCircle, 
@@ -21,7 +20,7 @@ import {
   QrCode, Smartphone, Banknote, Landmark, Camera, ScanLine, 
   TrendingUp, Coins, Loader2, AlertTriangle,
   Settings, Users, CheckSquare, ArrowLeft, User, Download,
-  ArrowDown, ArrowUp // Ganti ArrowCircle ke Arrow biasa (lebih aman)
+  ArrowDown, ArrowUp, ShoppingBag, Activity 
 } from 'lucide-react';
 
 /**
@@ -41,10 +40,11 @@ const formatRupiah = (number) => {
 };
 
 const formatDate = (dateString) => {
+  if (!dateString) return "-";
   try {
     return new Date(dateString).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' });
   } catch (e) {
-    return dateString || "-";
+    return dateString;
   }
 };
 
@@ -419,35 +419,34 @@ const App = () => {
   useEffect(() => {
     if (!user || isDemoMode) return;
 
-    // SAFETY WRAPPER FOR LISTENERS
-    try {
-        // Fetch Users (Admin Only)
-        let unsubUsers = () => {};
-        if (user.role === 'admin') {
-          unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
-            setUsersList(snap.docs.map(d => ({...d.data(), id: d.id})));
-          }, (err) => console.log("User Listener Error:", err));
-        }
-
-        // Main Listeners
-        const qTrx = query(collection(db, "transactions"), orderBy("createdAt", "desc"));
-        const unsubTrx = onSnapshot(qTrx, (snap) => { if (snap && snap.docs) setTransactions(snap.docs.map(d => ({ ...d.data(), id: d.id }))); }, (err) => console.log("Trx Listener Error:", err));
-        
-        const unsubSav = onSnapshot(collection(db, "savings"), (snap) => setSavings(snap.docs.map(d => ({ ...d.data(), id: d.id }))));
-        const unsubLoans = onSnapshot(collection(db, "loans"), (snap) => setLoans(snap.docs.map(d => ({ ...d.data(), id: d.id }))));
-        const unsubInvest = onSnapshot(collection(db, "my_investments"), (snap) => setMyInvestments(snap.docs.map(d => ({ ...d.data(), id: d.id }))));
-
-        // Cleanup
-        return () => { 
-          unsubUsers();
-          unsubTrx(); 
-          unsubSav(); 
-          unsubLoans(); 
-          unsubInvest(); 
-        };
-    } catch (e) {
-        console.error("Listener Init Failed:", e);
+    let unsubUsers = () => {};
+    if (user.role === 'admin') {
+      unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
+        setUsersList(snap.docs.map(d => ({...d.data(), id: d.id})));
+      }, (err) => console.log("Err fetch users:", err));
     }
+
+    let unsubTrx, unsubSav, unsubLoans, unsubInvest;
+
+    try {
+      const qTrx = query(collection(db, "transactions"), orderBy("createdAt", "desc"));
+      unsubTrx = onSnapshot(qTrx, (snap) => { if (snap && snap.docs) setTransactions(snap.docs.map(d => ({ ...d.data(), id: d.id }))); }, (err) => console.log("Trx Error:", err));
+      
+      unsubSav = onSnapshot(collection(db, "savings"), (snap) => setSavings(snap.docs.map(d => ({ ...d.data(), id: d.id }))));
+      unsubLoans = onSnapshot(collection(db, "loans"), (snap) => setLoans(snap.docs.map(d => ({ ...d.data(), id: d.id }))));
+      unsubInvest = onSnapshot(collection(db, "my_investments"), (snap) => setMyInvestments(snap.docs.map(d => ({ ...d.data(), id: d.id }))));
+
+    } catch (e) {
+      console.log("Listener failed:", e);
+    }
+    
+    return () => { 
+      if(unsubUsers) unsubUsers();
+      if(unsubTrx) unsubTrx(); 
+      if(unsubSav) unsubSav(); 
+      if(unsubLoans) unsubLoans(); 
+      if(unsubInvest) unsubInvest(); 
+    };
   }, [user, isDemoMode]);
 
   // --- AUTH ACTIONS ---
@@ -601,17 +600,14 @@ const App = () => {
   const handleLoanAction = async (id, status) => { if (isDemoMode) { setLoans(prev=>prev.map(l=>l.id===id?{...l,status}:l)); } else { await updateDoc(doc(db, "loans", id), { status }); } notify(`Status: ${status}`, 'success'); };
 
   // --- USER SCORE CALCULATION ---
-  // Variable totalIncome dll sudah dihapus di sini, pakai yg di bawah saja.
+  const totalIncome = transactions.filter(t => t.type === 'income').reduce((acc, curr) => acc + curr.amount, 0);
+  const totalExpense = transactions.filter(t => t.type === 'expense').reduce((acc, curr) => acc + curr.amount, 0);
+  const profit = totalIncome - totalExpense;
   
   const calculateScore = () => {
-    // Re-calculate inside function to avoid duplicate declaration error scope
-    const tInc = transactions.filter(t => t.type === 'income').reduce((acc, curr) => acc + curr.amount, 0);
-    const tExp = transactions.filter(t => t.type === 'expense').reduce((acc, curr) => acc + curr.amount, 0);
-    const prof = tInc - tExp;
-
     let score = scoreConfig.base;
-    score += Math.min(Math.floor(tInc / 100000) * scoreConfig.trxWeight, 200);
-    if (prof > 0) score += 100;
+    score += Math.min(Math.floor(totalIncome / 100000) * scoreConfig.trxWeight, 200);
+    if (profit > 0) score += 100;
     score += Math.min(savings.length * scoreConfig.savingWeight, 150);
     return Math.min(score, 850);
   };
@@ -698,7 +694,7 @@ const App = () => {
                   <Card className="bg-slate-800 border-l-4 border-l-yellow-500"><h3 className="text-slate-400 text-xs font-bold uppercase">Menunggu Persetujuan</h3><p className="text-3xl font-bold text-yellow-400 mt-2">{loans.filter(l => l.status === 'Pending').length}</p></Card>
                   <Card className="bg-slate-800 border-l-4 border-l-green-500"><h3 className="text-slate-400 text-xs font-bold uppercase">Total Disetujui</h3><p className="text-3xl font-bold text-green-400 mt-2">{loans.filter(l => l.status === 'Approved').length}</p></Card>
                </div>
-               <Card title="Antrian Pengajuan Pinjaman"><div className="overflow-x-auto mt-4"><table className="w-full text-left text-sm text-slate-400"><thead className="bg-slate-950 text-slate-200 uppercase font-bold text-xs"><tr><th className="px-4 py-3">User</th><th className="px-4 py-3">Jumlah</th><th className="px-4 py-3">Skor</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Aksi</th></tr></thead><tbody className="divide-y divide-slate-800">{loans.map(loan => (<tr key={loan.id} className="hover:bg-slate-800/50"><td className="px-4 py-4 text-white font-medium">{loan.userName}<div className="text-xs text-slate-500">{loan.date}</div></td><td className="px-4 py-4">{formatRupiah(loan.amount)}</td><td className="px-4 py-4"><span className="bg-blue-500/10 text-blue-400 px-2 py-1 rounded font-bold">{loan.userScore}</span></td><td className="px-4 py-4"><span className={`px-2 py-1 rounded text-xs font-bold uppercase ${loan.status === 'Approved' ? 'bg-green-500/20 text-green-400' : loan.status === 'Rejected' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{loan.status}</span></td><td className="px-4 py-4 flex justify-end gap-2">{loan.status === 'Pending' && <><button onClick={() => handleLoanAction(loan.id, 'Approved')} className="bg-green-600 p-1.5 rounded-md text-white hover:bg-green-500"><CheckCircle size={16}/></button><button onClick={() => handleLoanAction(loan.id, 'Rejected')} className="bg-red-600 p-1.5 rounded-md text-white hover:bg-red-500"><XCircle size={16}/></button></>}</td></tr>))}</tbody></table></div></Card>
+               <Card title="Antrian Pengajuan Pinjaman"><div className="overflow-x-auto mt-4"><table className="w-full text-left text-sm text-slate-400"><thead className="bg-slate-950 text-slate-200 uppercase font-bold text-xs"><tr><th className="px-4 py-3">User</th><th className="px-4 py-3">Jumlah</th><th className="px-4 py-3">Skor</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Aksi</th></tr></thead><tbody className="divide-y divide-slate-800">{loans.map(loan => (<tr key={loan.id} className="hover:bg-slate-800/50"><td className="px-4 py-4 text-white font-medium">{loan.userName || 'User'}<div className="text-xs text-slate-500">{loan.date}</div></td><td className="px-4 py-4">{formatRupiah(loan.amount)}</td><td className="px-4 py-4"><span className="bg-blue-500/10 text-blue-400 px-2 py-1 rounded font-bold">{loan.userScore}</span></td><td className="px-4 py-4"><span className={`px-2 py-1 rounded text-xs font-bold uppercase ${loan.status === 'Approved' ? 'bg-green-500/20 text-green-400' : loan.status === 'Rejected' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{loan.status}</span></td><td className="px-4 py-4 flex justify-end gap-2">{loan.status === 'Pending' && <><button onClick={() => handleLoanAction(loan.id, 'Approved')} className="bg-green-600 p-1.5 rounded-md text-white hover:bg-green-500"><CheckCircle size={16}/></button><button onClick={() => handleLoanAction(loan.id, 'Rejected')} className="bg-red-600 p-1.5 rounded-md text-white hover:bg-red-500"><XCircle size={16}/></button></>}</td></tr>))}</tbody></table></div></Card>
              </div>
            )}
            {adminTab === 'admin_monitoring' && (
@@ -708,7 +704,7 @@ const App = () => {
                         {usersList.filter(u => u.role === 'user').map(u => (
                           <div key={u.id} onClick={() => setSelectedUmkm(u)} className="bg-slate-900 border border-slate-800 p-6 rounded-xl hover:border-purple-500/50 cursor-pointer transition-all group">
                              <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center mb-4 group-hover:bg-purple-500/20 group-hover:text-purple-400 transition-colors"><User size={24} className="text-slate-400 group-hover:text-purple-400"/></div>
-                             <h3 className="text-white font-bold text-lg truncate">{u.username}</h3><p className="text-xs text-slate-500 mt-1">UMKM Terdaftar</p>
+                             <h3 className="text-white font-bold text-lg truncate">{u.username || 'Tanpa Nama'}</h3><p className="text-xs text-slate-500 mt-1">UMKM Terdaftar</p>
                              <div className="mt-4 text-xs text-purple-400 flex items-center gap-1">Lihat Detail <ExternalLink size={10}/></div>
                           </div>
                         ))}
@@ -716,9 +712,9 @@ const App = () => {
                  ) : (
                     <div className="animate-in slide-in-from-right">
                        <button onClick={() => setSelectedUmkm(null)} className="flex items-center gap-2 text-slate-400 hover:text-white mb-6 transition-colors"><ArrowLeft size={18}/> Kembali ke Daftar</button>
-                       <div className="flex items-center gap-4 mb-8"><div className="w-16 h-16 bg-purple-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold">{(selectedUmkm.username || 'U').charAt(0).toUpperCase()}</div><div><h2 className="text-2xl font-bold text-white">{selectedUmkm.username}</h2><p className="text-slate-400 text-sm">Dashboard Monitoring Real-time</p></div></div>
+                       <div className="flex items-center gap-4 mb-8"><div className="w-16 h-16 bg-purple-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold">{(selectedUmkm.username || 'U').charAt(0).toUpperCase()}</div><div><h2 className="text-2xl font-bold text-white">{selectedUmkm.username || 'User'}</h2><p className="text-slate-400 text-sm">Dashboard Monitoring Real-time</p></div></div>
                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6"><Card className="border-l-4 border-l-cyan-500" title="Total Omzet"><div className="text-xl font-bold text-white">{formatRupiah(transactions.filter(t => t.userName === selectedUmkm.username && t.type === 'income').reduce((a,c)=>a+c.amount,0))}</div></Card><Card className="border-l-4 border-l-green-500" title="Laba Bersih"><div className="text-xl font-bold text-green-400">{formatRupiah(transactions.filter(t => t.userName === selectedUmkm.username && t.type === 'income').reduce((a,c)=>a+c.amount,0) - transactions.filter(t => t.userName === selectedUmkm.username && t.type === 'expense').reduce((a,c)=>a+c.amount,0))}</div></Card><Card className="border-l-4 border-l-purple-500" title="Tabungan"><div className="text-xl font-bold text-white">{formatRupiah(savings.filter(s => s.userName === selectedUmkm.username).reduce((a,c)=>a+c.current,0))}</div></Card></div>
-                       <Card title={`Riwayat Transaksi: ${selectedUmkm.username}`}><div className="overflow-x-auto"><table className="w-full text-left text-sm text-slate-400"><thead className="bg-slate-950 text-slate-200 uppercase font-bold text-xs"><tr><th className="px-4 py-3">Tanggal</th><th className="px-4 py-3">Tipe</th><th className="px-4 py-3">Kategori</th><th className="px-4 py-3 text-right">Jumlah</th></tr></thead><tbody className="divide-y divide-slate-800">{transactions.filter(t => t.userName === selectedUmkm.username).map(t => (<tr key={t.id} className="hover:bg-slate-800/50"><td className="px-4 py-3">{formatDate(t.date)}</td><td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-[10px] uppercase ${t.type==='income'?'bg-green-500/10 text-green-400':'bg-red-500/10 text-red-400'}`}>{t.type==='income'?'Masuk':'Keluar'}</span></td><td className="px-4 py-3 text-white">{t.category}</td><td className={`px-4 py-3 text-right font-bold ${t.type==='income'?'text-green-400':'text-red-400'}`}>{formatRupiah(t.amount)}</td></tr>))}</tbody></table></div></Card>
+                       <Card title={`Riwayat Transaksi: ${selectedUmkm.username || 'User'}`}><div className="overflow-x-auto"><table className="w-full text-left text-sm text-slate-400"><thead className="bg-slate-950 text-slate-200 uppercase font-bold text-xs"><tr><th className="px-4 py-3">Tanggal</th><th className="px-4 py-3">Tipe</th><th className="px-4 py-3">Kategori</th><th className="px-4 py-3 text-right">Jumlah</th></tr></thead><tbody className="divide-y divide-slate-800">{transactions.filter(t => t.userName === selectedUmkm.username).map(t => (<tr key={t.id} className="hover:bg-slate-800/50"><td className="px-4 py-3">{formatDate(t.date)}</td><td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-[10px] uppercase ${t.type==='income'?'bg-green-500/10 text-green-400':'bg-red-500/10 text-red-400'}`}>{t.type==='income'?'Masuk':'Keluar'}</span></td><td className="px-4 py-3 text-white">{t.category}</td><td className={`px-4 py-3 text-right font-bold ${t.type==='income'?'text-green-400':'text-red-400'}`}>{formatRupiah(t.amount)}</td></tr>))}</tbody></table></div></Card>
                     </div>
                  )}
               </div>
@@ -738,11 +734,6 @@ const App = () => {
   }
 
   // --- USER VIEW ---
-  const totalIncome = transactions.filter(t => t.type === 'income').reduce((acc, curr) => acc + curr.amount, 0);
-  const totalExpense = transactions.filter(t => t.type === 'expense').reduce((acc, curr) => acc + curr.amount, 0);
-  const profit = totalIncome - totalExpense;
-  const totalSavings = savings.reduce((acc, curr) => acc + curr.current, 0);
-  
   const chartData = Object.entries(transactions.reduce((acc, t) => {
     if (t.type === 'income') acc[t.date] = (acc[t.date] || 0) + t.amount;
     return acc;
